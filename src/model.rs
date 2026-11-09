@@ -74,17 +74,19 @@ pub enum Action {
     Chain(u8),
     Search,
     Discard,
+    GyToHand,
 }
 
 impl Action {
     /// Auswahl im Editor. Ketten-Glieder 1 bis 6 reichen für die Praxis.
-    pub const CHOICES: [Action; 15] = [
+    pub const CHOICES: [Action; 16] = [
         Action::None,
         Action::Activate,
         Action::NormalSummon,
         Action::SpecialSummon,
         Action::Search,
         Action::Discard,
+        Action::GyToHand,
         Action::Set,
         Action::SendToGy,
         Action::Banish,
@@ -109,6 +111,7 @@ impl Action {
             Action::Chain(n) => format!("K{n}"),
             Action::Search => "🔍".into(),
             Action::Discard => "Ab".into(),
+            Action::GyToHand => "GY→Hand".into(),
         })
     }
 
@@ -118,12 +121,86 @@ impl Action {
             Action::Activate => "Effekt aktivieren".into(),
             Action::NormalSummon => "Normalbeschwörung".into(),
             Action::SpecialSummon => "Spezialbeschwörung".into(),
-            Action::Set => "Setzen".into(),
+            Action::Set => "Setzen (verdeckt)".into(),
             Action::SendToGy => "Auf den Friedhof legen".into(),
             Action::Banish => "Verbannen".into(),
             Action::Chain(n) => format!("Kettenglied {n}"),
             Action::Search => "Suchen (auf die Hand nehmen)".into(),
             Action::Discard => "Abwerfen".into(),
+            Action::GyToHand => "Vom Friedhof auf die Hand".into(),
+        }
+    }
+}
+
+/// Wohin die Karte gelegt wird.
+#[allow(clippy::enum_variant_names)]
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Zone {
+    #[default]
+    None,
+    MonsterZone,
+    /// Extra-Monsterzone, in der Link- und Extra-Deck-Monster landen.
+    ExtraMonsterZone,
+    SpellTrapZone,
+    PendulumLeft,
+    PendulumRight,
+    FieldZone,
+}
+
+impl Zone {
+    pub const ALL: [Zone; 7] = [
+        Zone::None,
+        Zone::MonsterZone,
+        Zone::ExtraMonsterZone,
+        Zone::SpellTrapZone,
+        Zone::PendulumLeft,
+        Zone::PendulumRight,
+        Zone::FieldZone,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Zone::None => "Keine Angabe",
+            Zone::MonsterZone => "Monsterzone",
+            Zone::ExtraMonsterZone => "Extra-Monsterzone (Link-Zone)",
+            Zone::SpellTrapZone => "Zauber-/Fallenzone",
+            Zone::PendulumLeft => "Pendelzone links",
+            Zone::PendulumRight => "Pendelzone rechts",
+            Zone::FieldZone => "Feldzauberzone",
+        }
+    }
+
+    /// Kurzes Kürzel für die Anzeige oben rechts auf der Karte.
+    pub fn badge(self) -> Option<&'static str> {
+        Some(match self {
+            Zone::None => return None,
+            Zone::MonsterZone => "MZ",
+            Zone::ExtraMonsterZone => "EMZ",
+            Zone::SpellTrapZone => "Z/F",
+            Zone::PendulumLeft => "P-L",
+            Zone::PendulumRight => "P-R",
+            Zone::FieldZone => "Feld",
+        })
+    }
+}
+
+/// Offen oder verdeckt.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Facing {
+    #[default]
+    Unspecified,
+    FaceUp,
+    FaceDown,
+}
+
+impl Facing {
+    pub const ALL: [Facing; 3] = [Facing::Unspecified, Facing::FaceUp, Facing::FaceDown];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Facing::Unspecified => "Keine Angabe",
+            Facing::FaceUp => "Offen",
+            Facing::FaceDown => "Verdeckt",
         }
     }
 }
@@ -136,6 +213,10 @@ pub struct Entry {
     pub action: Action,
     #[serde(default)]
     pub note: String,
+    #[serde(default)]
+    pub zone: Zone,
+    #[serde(default)]
+    pub facing: Facing,
 }
 
 impl Entry {
@@ -144,6 +225,8 @@ impl Entry {
             slot,
             action: Action::None,
             note: String::new(),
+            zone: Zone::None,
+            facing: Facing::Unspecified,
         }
     }
 }
@@ -408,6 +491,8 @@ mod tests {
                         slot: card(1, "Lunalight Gold Leo"),
                         action: Action::NormalSummon,
                         note: "NS".into(),
+                        zone: Zone::MonsterZone,
+                        facing: Facing::FaceUp,
                     },
                 },
                 StepPart {

@@ -15,8 +15,26 @@ use crate::cards::{self, CardDb, CardDbFile};
 use crate::decks;
 use crate::images::ImageCache;
 use crate::model::{
-    Action, CardKind, Combo, Connector, Deck, Entry, Section, Slot, Step, StepPart,
+    Action, CardKind, Combo, Connector, Deck, Entry, Facing, Section, Slot, Step, StepPart, Zone,
 };
+
+/// Markierungen, die auf eine Karte gezeichnet werden.
+#[derive(Clone, Copy, Default)]
+struct Marks {
+    action: Action,
+    zone: Zone,
+    facing: Facing,
+}
+
+impl Marks {
+    fn of(e: &Entry) -> Self {
+        Self {
+            action: e.action,
+            zone: e.zone,
+            facing: e.facing,
+        }
+    }
+}
 use crate::practice::Session;
 use crate::storage::{self, Paths, Settings};
 use crate::updater::{self, UpdateInfo};
@@ -507,10 +525,11 @@ fn card_widget(
     db: &CardDb,
     german: bool,
     slot: &Slot,
-    action: Action,
+    marks: Marks,
     width: f32,
     highlight: Option<Color32>,
 ) -> egui::Response {
+    let action = marks.action;
     let size = Vec2::new(width, width * CARD_RATIO);
     let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
     if ui.is_rect_visible(rect) {
@@ -536,21 +555,45 @@ fn card_widget(
             }
             Slot::Placeholder { kind, label } => draw_text(label, kind_color(*kind)),
         }
-        if let Some(badge) = action.badge() {
-            let r = (width / 7.0).clamp(9.0, 14.0);
-            let c = rect.left_bottom() + Vec2::new(r + 2.0, -r - 2.0);
-            painter.circle(
-                c,
-                r,
-                Color32::from_black_alpha(220),
-                Stroke::new(1.5, Color32::WHITE),
-            );
+        // Verdeckt: Karte abdunkeln und „verdeckt“ darauf schreiben.
+        if marks.facing == Facing::FaceDown {
+            painter.rect_filled(rect, 4.0, Color32::from_black_alpha(150));
             painter.text(
-                c,
+                rect.center(),
                 Align2::CENTER_CENTER,
-                badge,
-                FontId::proportional(r * 0.95),
+                "verdeckt",
+                FontId::proportional((width / 6.0).clamp(9.0, 16.0)),
                 Color32::WHITE,
+            );
+        }
+        let font_size = (width / 7.5).clamp(9.0, 14.0);
+        // Aktion: Plakette unten links.
+        if let Some(badge) = action.badge() {
+            pill(
+                painter,
+                rect.left_bottom() + Vec2::new(2.0, -2.0),
+                Align2::LEFT_BOTTOM,
+                &badge,
+                font_size,
+                Color32::from_black_alpha(220),
+            );
+        }
+        // Zone (und „offen“): Plakette oben rechts.
+        let mut zone_text = marks.zone.badge().unwrap_or("").to_string();
+        if marks.facing == Facing::FaceUp {
+            if !zone_text.is_empty() {
+                zone_text.push(' ');
+            }
+            zone_text.push_str("offen");
+        }
+        if !zone_text.is_empty() {
+            pill(
+                painter,
+                rect.right_top() + Vec2::new(-2.0, 2.0),
+                Align2::RIGHT_TOP,
+                &zone_text,
+                font_size,
+                Color32::from_rgba_unmultiplied(20, 60, 120, 230),
             );
         }
         if let Some(color) = highlight {
@@ -571,7 +614,30 @@ fn card_widget(
         if action != Action::None {
             ui.label(format!("Aktion: {}", action.label()));
         }
+        if marks.zone != Zone::None {
+            ui.label(format!("Zone: {}", marks.zone.label()));
+        }
+        if marks.facing != Facing::Unspecified {
+            ui.label(format!("Lage: {}", marks.facing.label()));
+        }
     })
+}
+
+/// Zeichnet eine abgerundete Plakette mit Text. `anchor` legt fest, an
+/// welcher Ecke der Plakette `pos` liegt.
+fn pill(painter: &egui::Painter, pos: Pos2, anchor: Align2, text: &str, size: f32, fill: Color32) {
+    let galley =
+        painter.layout_no_wrap(text.to_string(), FontId::proportional(size), Color32::WHITE);
+    let pad = Vec2::new(4.0, 1.5);
+    let rect = anchor.anchor_size(pos, galley.size() + pad * 2.0);
+    painter.rect(
+        rect,
+        rect.height() / 2.0,
+        fill,
+        Stroke::new(1.0, Color32::WHITE),
+        StrokeKind::Inside,
+    );
+    painter.galley(rect.min + pad, galley, Color32::WHITE);
 }
 
 /// Karte mit Notiz darunter.
@@ -592,7 +658,7 @@ fn entry_view(
             db,
             german,
             &entry.slot,
-            entry.action,
+            Marks::of(entry),
             width,
             highlight,
         );
@@ -1119,7 +1185,7 @@ impl ComboApp {
             &self.db,
             german,
             &entry.slot,
-            entry.action,
+            Marks::of(entry),
             160.0,
             None,
         );
@@ -1149,6 +1215,25 @@ impl ComboApp {
                         .changed();
                 }
             });
+
+        ui.label("Zone");
+        egui::ComboBox::from_id_salt("zone")
+            .selected_text(entry.zone.label())
+            .width(200.0)
+            .show_ui(ui, |ui| {
+                for z in Zone::ALL {
+                    changed |= ui.selectable_value(&mut entry.zone, z, z.label()).changed();
+                }
+            });
+
+        ui.label("Lage");
+        ui.horizontal(|ui| {
+            for f in Facing::ALL {
+                changed |= ui
+                    .selectable_value(&mut entry.facing, f, f.label())
+                    .changed();
+            }
+        });
 
         if let Some(conn) = connector {
             ui.label("Zeichen davor");
@@ -1365,7 +1450,7 @@ impl ComboApp {
                     ui.label("Welche Karten werden in diesem Schritt benutzt? Klicke auf eine geratene Karte, um sie zu entfernen.");
                     ui.horizontal_wrapped(|ui| {
                         for (gi, g) in session.guesses.iter().enumerate() {
-                            if card_widget(ui, images, db, german, g, Action::None, width, None).clicked() {
+                            if card_widget(ui, images, db, german, g, Marks::default(), width, None).clicked() {
                                 op = Some(POp::RemoveGuess(gi));
                             }
                         }
@@ -1399,7 +1484,7 @@ impl ComboApp {
                         ui.label("Falsch geraten:");
                         ui.horizontal_wrapped(|ui| {
                             for &gi in &check.wrong_guesses {
-                                card_widget(ui, images, db, german, &session.guesses[gi], Action::None, width, Some(BAD_COLOR));
+                                card_widget(ui, images, db, german, &session.guesses[gi], Marks::default(), width, Some(BAD_COLOR));
                             }
                         });
                     }
@@ -1496,7 +1581,7 @@ impl ComboApp {
                             ui.horizontal_wrapped(|ui| {
                                 for c in cards {
                                     let slot = c.to_slot();
-                                    if card_widget(ui, images, db, german, &slot, Action::None, 56.0, None).clicked() {
+                                    if card_widget(ui, images, db, german, &slot, Marks::default(), 56.0, None).clicked() {
                                         chosen = Some(slot);
                                     }
                                 }
@@ -1525,7 +1610,7 @@ impl ComboApp {
                     for card in &results {
                         ui.horizontal(|ui| {
                             let slot = card.to_slot();
-                            let thumb = card_widget(ui, images, db, german, &slot, Action::None, 40.0, None);
+                            let thumb = card_widget(ui, images, db, german, &slot, Marks::default(), 40.0, None);
                             let name = match (&card.name_de, german) {
                                 (Some(de), true) => format!("{de}\n{}", card.name),
                                 _ => card.name.clone(),
@@ -1818,7 +1903,7 @@ impl ComboApp {
                             &self.db,
                             german,
                             &slot,
-                            Action::None,
+                            Marks::default(),
                             width,
                             None,
                         );

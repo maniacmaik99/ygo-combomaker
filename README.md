@@ -60,12 +60,12 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | Combos, Einstellungen | `~/.local/share/ygo-combomaker/` | `%APPDATA%\ygo-combomaker\data\` |
 | Kartendatenbank, Bilder | `~/.cache/ygo-combomaker/` | `%LOCALAPPDATA%\ygo-combomaker\cache\` |
 
-## Funktionen (Stand 0.2)
+## Funktionen (Stand 0.3)
 
 - Combo anlegen: Titel, Deck, Autor, Notizen
 - Bereiche: Starthand, Endboard, „Spielt um“ (Handtraps), Benötigte Karten, Schritte
 - Karten über die Suche (englischer oder deutscher Name) oder als Platzhalter („Any Card“, „discard“)
-- Pro Karte: Aktion (Effekt, Normal-/Spezialbeschwörung, Suchen, Abwerfen, Setzen, Friedhof, Verbannen, Kettenglied 1–6) und Notiz
+- Pro Karte: Aktion (Effekt, Normal-/Spezialbeschwörung, Suchen, Abwerfen, vom Friedhof auf die Hand, Setzen, Friedhof, Verbannen, Kettenglied 1–6), Zone (Monsterzone, Extra-Monsterzone/Link-Zone, Zauber-/Fallenzone, Pendelzone links/rechts, Feldzauberzone), Lage (offen/verdeckt) und Notiz
 - Decklisten: aus einem Archetyp füllen oder importieren (ydke-Link, YDK-Datei, Kartenliste als Text). Eine Combo kann mit einer Deckliste verknüpft werden; deren Karten stehen beim Eintragen ganz oben und sind mit einem Klick auswählbar
 - Schritte mit Zeichen zwischen den Karten: → ← + = (anklicken zum Ändern)
 - Übungsmodus: Karten pro Schritt raten, prüfen, Ergebnis in Prozent, bestes Ergebnis wird gespeichert
