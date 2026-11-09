@@ -17,11 +17,11 @@ impl CardKind {
     pub const ALL: [CardKind; 3] = [CardKind::Monster, CardKind::Spell, CardKind::Trap];
 
     pub fn label(self) -> &'static str {
-        match self {
-            CardKind::Monster => "Monster",
-            CardKind::Spell => "Zauber",
-            CardKind::Trap => "Falle",
-        }
+        crate::i18n::tr(match self {
+            CardKind::Monster => "kind.monster",
+            CardKind::Spell => "kind.spell",
+            CardKind::Trap => "kind.trap",
+        })
     }
 }
 
@@ -59,76 +59,230 @@ impl Slot {
     }
 }
 
-/// Was mit der Karte in diesem Moment passiert. Wird als kleines Symbol
-/// auf der Karte angezeigt.
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+/// Was mit der Karte in diesem Moment passiert. Wird als kleine Plakette
+/// auf der Karte angezeigt. Die Namen der Varianten sind Teil des
+/// Speicherformats und dürfen nicht umbenannt werden.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default, Hash)]
 pub enum Action {
     #[default]
     None,
+    // Aktivieren und Legen
     Activate,
+    Chain(u8),
+    PlacePendulum,
+    SetSpellTrap,
+    PlaceOnField,
+    Equip,
+    // Beschwören
     NormalSummon,
-    SpecialSummon,
+    TributeSummon,
     Set,
+    FlipSummon,
+    SpecialSummon,
+    FusionSummon,
+    RitualSummon,
+    SynchroSummon,
+    XyzSummon,
+    PendulumSummon,
+    LinkSummon,
+    // Kosten und Material
+    Tribute,
+    UseAsMaterial,
+    AttachMaterial,
+    DetachMaterial,
+    Discard,
+    // Bewegen
+    Search,
+    Draw,
     SendToGy,
     Banish,
-    Chain(u8),
-    Search,
-    Discard,
+    Destroy,
+    ReturnToHand,
     GyToHand,
+    GyToDeck,
+    BanishedToHand,
+    BanishedToGy,
+    ReturnToDeck,
+    ReturnToExtraDeck,
+    Reveal,
+    // Sonstiges
+    Negate,
+    Target,
+    ChangePosition,
+}
+
+/// Gruppe von Aktionen für die Auswahl.
+pub struct ActionGroup {
+    pub key: &'static str,
+    pub actions: &'static [Action],
 }
 
 impl Action {
-    /// Auswahl im Editor. Ketten-Glieder 1 bis 6 reichen für die Praxis.
-    pub const CHOICES: [Action; 16] = [
-        Action::None,
-        Action::Activate,
-        Action::NormalSummon,
-        Action::SpecialSummon,
-        Action::Search,
-        Action::Discard,
-        Action::GyToHand,
-        Action::Set,
-        Action::SendToGy,
-        Action::Banish,
-        Action::Chain(1),
-        Action::Chain(2),
-        Action::Chain(3),
-        Action::Chain(4),
-        Action::Chain(5),
-        Action::Chain(6),
+    /// Alle Aktionen nach Gruppen. Für Ketten steht `Chain(1)` stellvertretend;
+    /// die Nummer wird in einem eigenen Feld eingegeben.
+    pub const GROUPS: &'static [ActionGroup] = &[
+        ActionGroup {
+            key: "actgroup.activate",
+            actions: &[
+                Action::Activate,
+                Action::Chain(1),
+                Action::PlacePendulum,
+                Action::SetSpellTrap,
+                Action::PlaceOnField,
+                Action::Equip,
+            ],
+        },
+        ActionGroup {
+            key: "actgroup.summon",
+            actions: &[
+                Action::NormalSummon,
+                Action::TributeSummon,
+                Action::Set,
+                Action::FlipSummon,
+                Action::SpecialSummon,
+                Action::FusionSummon,
+                Action::RitualSummon,
+                Action::SynchroSummon,
+                Action::XyzSummon,
+                Action::PendulumSummon,
+                Action::LinkSummon,
+            ],
+        },
+        ActionGroup {
+            key: "actgroup.cost",
+            actions: &[
+                Action::Tribute,
+                Action::UseAsMaterial,
+                Action::AttachMaterial,
+                Action::DetachMaterial,
+                Action::Discard,
+            ],
+        },
+        ActionGroup {
+            key: "actgroup.move",
+            actions: &[
+                Action::Search,
+                Action::Draw,
+                Action::SendToGy,
+                Action::Banish,
+                Action::Destroy,
+                Action::ReturnToHand,
+                Action::GyToHand,
+                Action::GyToDeck,
+                Action::BanishedToHand,
+                Action::BanishedToGy,
+                Action::ReturnToDeck,
+                Action::ReturnToExtraDeck,
+                Action::Reveal,
+            ],
+        },
+        ActionGroup {
+            key: "actgroup.other",
+            actions: &[Action::Negate, Action::Target, Action::ChangePosition],
+        },
     ];
 
-    /// Kurzes Kürzel für das Symbol auf der Karte.
-    pub fn badge(self) -> Option<String> {
-        Some(match self {
-            Action::None => return None,
-            Action::Activate => "A".into(),
-            Action::NormalSummon => "NS".into(),
-            Action::SpecialSummon => "SS".into(),
-            Action::Set => "Set".into(),
-            Action::SendToGy => "GY".into(),
-            Action::Banish => "Ban".into(),
-            Action::Chain(n) => format!("K{n}"),
-            Action::Search => "🔍".into(),
-            Action::Discard => "Ab".into(),
-            Action::GyToHand => "GY→Hand".into(),
-        })
+    /// Gleiche Aktion, unabhängig von der Kettennummer.
+    pub fn same_kind(self, other: Action) -> bool {
+        matches!((self, other), (Action::Chain(_), Action::Chain(_))) || self == other
+    }
+
+    /// Schlüssel für den Namen der Aktion (ohne Kettennummer).
+    pub fn key(self) -> &'static str {
+        match self {
+            Action::None => "action.none",
+            Action::Activate => "action.activate",
+            Action::Chain(_) => "action.chain",
+            Action::PlacePendulum => "action.place_pendulum",
+            Action::SetSpellTrap => "action.set_spell_trap",
+            Action::PlaceOnField => "action.place_on_field",
+            Action::Equip => "action.equip",
+            Action::NormalSummon => "action.normal_summon",
+            Action::TributeSummon => "action.tribute_summon",
+            Action::Set => "action.set_monster",
+            Action::FlipSummon => "action.flip_summon",
+            Action::SpecialSummon => "action.special_summon",
+            Action::FusionSummon => "action.fusion_summon",
+            Action::RitualSummon => "action.ritual_summon",
+            Action::SynchroSummon => "action.synchro_summon",
+            Action::XyzSummon => "action.xyz_summon",
+            Action::PendulumSummon => "action.pendulum_summon",
+            Action::LinkSummon => "action.link_summon",
+            Action::Tribute => "action.tribute",
+            Action::UseAsMaterial => "action.use_as_material",
+            Action::AttachMaterial => "action.attach_material",
+            Action::DetachMaterial => "action.detach_material",
+            Action::Discard => "action.discard",
+            Action::Search => "action.search",
+            Action::Draw => "action.draw",
+            Action::SendToGy => "action.send_to_gy",
+            Action::Banish => "action.banish",
+            Action::Destroy => "action.destroy",
+            Action::ReturnToHand => "action.return_to_hand",
+            Action::GyToHand => "action.gy_to_hand",
+            Action::GyToDeck => "action.gy_to_deck",
+            Action::BanishedToHand => "action.banished_to_hand",
+            Action::BanishedToGy => "action.banished_to_gy",
+            Action::ReturnToDeck => "action.return_to_deck",
+            Action::ReturnToExtraDeck => "action.return_to_extra",
+            Action::Reveal => "action.reveal",
+            Action::Negate => "action.negate",
+            Action::Target => "action.target",
+            Action::ChangePosition => "action.change_position",
+        }
     }
 
     pub fn label(self) -> String {
         match self {
-            Action::None => "Keine".into(),
-            Action::Activate => "Effekt aktivieren".into(),
-            Action::NormalSummon => "Normalbeschwörung".into(),
-            Action::SpecialSummon => "Spezialbeschwörung".into(),
-            Action::Set => "Setzen (verdeckt)".into(),
-            Action::SendToGy => "Auf den Friedhof legen".into(),
-            Action::Banish => "Verbannen".into(),
-            Action::Chain(n) => format!("Kettenglied {n}"),
-            Action::Search => "Suchen (auf die Hand nehmen)".into(),
-            Action::Discard => "Abwerfen".into(),
-            Action::GyToHand => "Vom Friedhof auf die Hand".into(),
+            Action::Chain(n) => crate::i18n::trf("action.chain_n", &[&n]),
+            other => crate::i18n::tr(other.key()).to_string(),
         }
+    }
+
+    /// Kurzes Kürzel für die Plakette auf der Karte.
+    pub fn badge(self) -> Option<String> {
+        let b = match self {
+            Action::None => return None,
+            Action::Chain(n) => return Some(crate::i18n::trf("badge.chain", &[&n])),
+            Action::Activate => "badge.activate",
+            Action::PlacePendulum => "badge.place_pendulum",
+            Action::SetSpellTrap => "badge.set",
+            Action::PlaceOnField => "badge.place_on_field",
+            Action::Equip => "badge.equip",
+            Action::NormalSummon => "badge.normal_summon",
+            Action::TributeSummon => "badge.tribute_summon",
+            Action::Set => "badge.set",
+            Action::FlipSummon => "badge.flip_summon",
+            Action::SpecialSummon => "badge.special_summon",
+            Action::FusionSummon => "badge.fusion_summon",
+            Action::RitualSummon => "badge.ritual_summon",
+            Action::SynchroSummon => "badge.synchro_summon",
+            Action::XyzSummon => "badge.xyz_summon",
+            Action::PendulumSummon => "badge.pendulum_summon",
+            Action::LinkSummon => "badge.link_summon",
+            Action::Tribute => "badge.tribute",
+            Action::UseAsMaterial => "badge.use_as_material",
+            Action::AttachMaterial => "badge.attach_material",
+            Action::DetachMaterial => "badge.detach_material",
+            Action::Discard => "badge.discard",
+            Action::Search => "badge.search",
+            Action::Draw => "badge.draw",
+            Action::SendToGy => "badge.send_to_gy",
+            Action::Banish => "badge.banish",
+            Action::Destroy => "badge.destroy",
+            Action::ReturnToHand => "badge.return_to_hand",
+            Action::GyToHand => "badge.gy_to_hand",
+            Action::GyToDeck => "badge.gy_to_deck",
+            Action::BanishedToHand => "badge.banished_to_hand",
+            Action::BanishedToGy => "badge.banished_to_gy",
+            Action::ReturnToDeck => "badge.return_to_deck",
+            Action::ReturnToExtraDeck => "badge.return_to_extra",
+            Action::Reveal => "badge.reveal",
+            Action::Negate => "badge.negate",
+            Action::Target => "badge.target",
+            Action::ChangePosition => "badge.change_position",
+        };
+        Some(crate::i18n::tr(b).to_string())
     }
 }
 
@@ -145,10 +299,14 @@ pub enum Zone {
     PendulumLeft,
     PendulumRight,
     FieldZone,
+    /// Nur als Ziel von „Suchen“: auf die Hand.
+    Hand,
+    /// Nur als Ziel von „Suchen“: auf den Friedhof.
+    Graveyard,
 }
 
 impl Zone {
-    pub const ALL: [Zone; 7] = [
+    pub const ALL: [Zone; 9] = [
         Zone::None,
         Zone::MonsterZone,
         Zone::ExtraMonsterZone,
@@ -156,31 +314,37 @@ impl Zone {
         Zone::PendulumLeft,
         Zone::PendulumRight,
         Zone::FieldZone,
+        Zone::Hand,
+        Zone::Graveyard,
     ];
 
     pub fn label(self) -> &'static str {
-        match self {
-            Zone::None => "Keine Angabe",
-            Zone::MonsterZone => "Monsterzone",
-            Zone::ExtraMonsterZone => "Extra-Monsterzone (Link-Zone)",
-            Zone::SpellTrapZone => "Zauber-/Fallenzone",
-            Zone::PendulumLeft => "Pendelzone links",
-            Zone::PendulumRight => "Pendelzone rechts",
-            Zone::FieldZone => "Feldzauberzone",
-        }
+        crate::i18n::tr(match self {
+            Zone::None => "zone.none",
+            Zone::MonsterZone => "zone.monster",
+            Zone::ExtraMonsterZone => "zone.extra_monster",
+            Zone::SpellTrapZone => "zone.spell_trap",
+            Zone::PendulumLeft => "zone.pendulum_left",
+            Zone::PendulumRight => "zone.pendulum_right",
+            Zone::FieldZone => "zone.field",
+            Zone::Hand => "zone.hand",
+            Zone::Graveyard => "zone.graveyard",
+        })
     }
 
     /// Kurzes Kürzel für die Anzeige oben rechts auf der Karte.
     pub fn badge(self) -> Option<&'static str> {
-        Some(match self {
+        Some(crate::i18n::tr(match self {
             Zone::None => return None,
-            Zone::MonsterZone => "MZ",
-            Zone::ExtraMonsterZone => "EMZ",
-            Zone::SpellTrapZone => "Z/F",
-            Zone::PendulumLeft => "P-L",
-            Zone::PendulumRight => "P-R",
-            Zone::FieldZone => "Feld",
-        })
+            Zone::MonsterZone => "zonebadge.monster",
+            Zone::ExtraMonsterZone => "zonebadge.extra_monster",
+            Zone::SpellTrapZone => "zonebadge.spell_trap",
+            Zone::PendulumLeft => "zonebadge.pendulum_left",
+            Zone::PendulumRight => "zonebadge.pendulum_right",
+            Zone::FieldZone => "zonebadge.field",
+            Zone::Hand => "zonebadge.hand",
+            Zone::Graveyard => "zonebadge.graveyard",
+        }))
     }
 }
 
@@ -197,11 +361,11 @@ impl Facing {
     pub const ALL: [Facing; 3] = [Facing::Unspecified, Facing::FaceUp, Facing::FaceDown];
 
     pub fn label(self) -> &'static str {
-        match self {
-            Facing::Unspecified => "Keine Angabe",
-            Facing::FaceUp => "Offen",
-            Facing::FaceDown => "Verdeckt",
-        }
+        crate::i18n::tr(match self {
+            Facing::Unspecified => "facing.unspecified",
+            Facing::FaceUp => "facing.face_up",
+            Facing::FaceDown => "facing.face_down",
+        })
     }
 }
 
@@ -435,12 +599,12 @@ impl Section {
     ];
 
     pub fn label(self) -> &'static str {
-        match self {
-            Section::StartingHand => "Starthand",
-            Section::Endboard => "Endboard",
-            Section::PlaysAround => "Spielt um (Handtraps)",
-            Section::Required => "Benötigte Karten",
-        }
+        crate::i18n::tr(match self {
+            Section::StartingHand => "section.starting_hand",
+            Section::Endboard => "section.endboard",
+            Section::PlaysAround => "section.plays_around",
+            Section::Required => "section.required",
+        })
     }
 
     pub fn entries(self, combo: &Combo) -> &Vec<Entry> {

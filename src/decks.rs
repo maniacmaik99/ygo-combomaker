@@ -151,7 +151,7 @@ mod tests {
           {"id":24094653,"name":"Polymerization","type":"Spell Card","card_images":[{"id":24094653}]}
         ]}"#;
         let mut cards = parse_api_cards(json.as_bytes()).unwrap();
-        cards[1].name_de = Some("Polymerisation".into());
+        cards[1].names.insert("de".into(), "Polymerisation".into());
         CardDb::from_file(CardDbFile {
             version: "1".into(),
             cards,

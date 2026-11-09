@@ -20,8 +20,12 @@ pub struct Card {
     pub id: u32,
     pub image_id: u32,
     pub name: String,
-    #[serde(default)]
+    /// Alt (bis 0.3): deutscher Name. Wird beim Laden nach `names` übernommen.
+    #[serde(default, skip_serializing)]
     pub name_de: Option<String>,
+    /// Übersetzte Namen nach Sprachcode ("de", "fr", "it", "pt").
+    #[serde(default)]
+    pub names: std::collections::BTreeMap<String, String>,
     pub kind: CardKind,
     /// z. B. "Effect Monster", "Fusion Monster", "Spell Card".
     pub type_line: String,
@@ -37,6 +41,19 @@ pub struct Card {
 }
 
 impl Card {
+    /// Name in der gewünschten Sprache, sonst Englisch.
+    pub fn localized_name(&self, code: Option<&str>) -> &str {
+        code.and_then(|c| self.names.get(c))
+            .map(String::as_str)
+            .unwrap_or(&self.name)
+    }
+
+    pub fn is_extra_deck(&self) -> bool {
+        ["Fusion", "Synchro", "XYZ", "Link"]
+            .iter()
+            .any(|t| self.type_line.contains(t))
+    }
+
     pub fn to_slot(&self) -> Slot {
         Slot::Card {
             id: self.id,
@@ -66,7 +83,12 @@ pub struct CardDb {
 }
 
 impl CardDb {
-    pub fn from_file(file: CardDbFile) -> Self {
+    pub fn from_file(mut file: CardDbFile) -> Self {
+        for c in &mut file.cards {
+            if let Some(de) = c.name_de.take() {
+                c.names.entry("de".into()).or_insert(de);
+            }
+        }
         let mut db = CardDb {
             version: file.version,
             cards: file.cards,
@@ -82,9 +104,9 @@ impl CardDb {
             .iter()
             .map(|c| {
                 let mut key = c.name.to_lowercase();
-                if let Some(de) = &c.name_de {
+                for n in c.names.values() {
                     key.push('\u{1}');
-                    key.push_str(&de.to_lowercase());
+                    key.push_str(&n.to_lowercase());
                 }
                 key
             })
@@ -114,8 +136,7 @@ impl CardDb {
     pub fn find_by_name(&self, name: &str) -> Option<&Card> {
         let name = name.trim().to_lowercase();
         self.cards.iter().find(|c| {
-            c.name.to_lowercase() == name
-                || c.name_de.as_ref().is_some_and(|d| d.to_lowercase() == name)
+            c.name.to_lowercase() == name || c.names.values().any(|n| n.to_lowercase() == name)
         })
     }
 
@@ -177,7 +198,8 @@ impl CardDb {
 // ---------------------------------------------------------------------------
 
 pub fn load_from_disk(path: &Path) -> Result<CardDbFile> {
-    let bytes = std::fs::read(path).with_context(|| format!("Lesen von {}", path.display()))?;
+    let bytes = std::fs::read(path)
+        .with_context(|| crate::i18n::trf("err.read_failed", &[&path.display()]))?;
     Ok(serde_json::from_slice(&bytes)?)
 }
 
@@ -239,7 +261,7 @@ fn kind_from_type(type_line: &str) -> CardKind {
 /// Wandelt die API-Antwort in unsere kompakte Kartenliste um.
 pub fn parse_api_cards(json: &[u8]) -> Result<Vec<Card>> {
     let resp: ApiResponse =
-        serde_json::from_slice(json).context("API-Antwort ist kein gültiges JSON")?;
+        serde_json::from_slice(json).context(crate::i18n::tr("err.api_invalid_json"))?;
     Ok(resp
         .data
         .into_iter()
@@ -254,6 +276,7 @@ pub fn parse_api_cards(json: &[u8]) -> Result<Vec<Card>> {
                 kind: kind_from_type(&c.type_line),
                 name: c.name,
                 name_de: None,
+                names: Default::default(),
                 type_line: c.type_line,
                 archetype: c.archetype,
                 desc: c.desc,
@@ -274,7 +297,7 @@ fn http_get(url: &str) -> Result<Vec<u8>> {
     let mut resp = ureq::get(url)
         .header("User-Agent", USER_AGENT)
         .call()
-        .with_context(|| format!("Anfrage an {url} fehlgeschlagen"))?;
+        .with_context(|| crate::i18n::trf("err.request_failed", &[&url]))?;
     Ok(resp
         .body_mut()
         .with_config()
@@ -285,7 +308,7 @@ fn http_get(url: &str) -> Result<Vec<u8>> {
 pub fn fetch_db_version() -> Result<String> {
     let bytes = http_get(&format!("{API_BASE}/checkDBVer.php"))?;
     let v: Vec<ApiDbVersion> = serde_json::from_slice(&bytes)?;
-    let v = v.first().context("Leere Versionsantwort")?;
+    let v = v.first().context(crate::i18n::tr("err.empty_version"))?;
     Ok(match &v.database_version {
         serde_json::Value::String(s) => s.clone(),
         other => other.to_string(),
@@ -296,23 +319,30 @@ pub fn fetch_db_version() -> Result<String> {
 /// danach deutsche Namen). Schlägt der deutsche Teil fehl, bleibt nur
 /// Englisch.
 pub fn fetch_full_db(progress: &dyn Fn(&str)) -> Result<CardDbFile> {
-    progress("Prüfe Datenbank-Version …");
+    progress(crate::i18n::tr("db.checking_version"));
     let version = fetch_db_version().unwrap_or_default();
 
-    progress("Lade alle Karten (englisch) …");
+    progress(crate::i18n::tr("db.loading_cards"));
     let bytes = http_get(&format!("{API_BASE}/cardinfo.php?misc=yes"))?;
-    progress("Verarbeite Karten …");
+    progress(crate::i18n::tr("db.processing"));
     let mut cards = parse_api_cards(&bytes)?;
 
-    progress("Lade deutsche Kartennamen …");
-    // Pause, damit die zwei großen Anfragen nicht direkt hintereinander kommen.
-    std::thread::sleep(std::time::Duration::from_millis(500));
-    if let Ok(bytes) = http_get(&format!("{API_BASE}/cardinfo.php?language=de"))
-        && let Ok(names) = parse_api_names(&bytes)
-    {
-        let map: std::collections::HashMap<u32, String> = names.into_iter().collect();
-        for c in &mut cards {
-            c.name_de = map.get(&c.id).cloned();
+    for code in ["de", "fr", "it", "pt"] {
+        progress(&format!(
+            "{} ({code}) …",
+            crate::i18n::tr("db.loading_names")
+        ));
+        // Pause, damit die großen Anfragen nicht direkt hintereinander kommen.
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if let Ok(bytes) = http_get(&format!("{API_BASE}/cardinfo.php?language={code}"))
+            && let Ok(names) = parse_api_names(&bytes)
+        {
+            let map: std::collections::HashMap<u32, String> = names.into_iter().collect();
+            for c in &mut cards {
+                if let Some(n) = map.get(&c.id) {
+                    c.names.insert(code.to_string(), n.clone());
+                }
+            }
         }
     }
     Ok(CardDbFile { version, cards })
@@ -351,7 +381,7 @@ mod tests {
     #[test]
     fn search_ranks_and_filters() {
         let mut cards = parse_api_cards(SAMPLE.as_bytes()).unwrap();
-        cards[1].name_de = Some("Polymerisation".into());
+        cards[1].names.insert("de".into(), "Polymerisation".into());
         let db = CardDb::from_file(CardDbFile {
             version: "1".into(),
             cards,

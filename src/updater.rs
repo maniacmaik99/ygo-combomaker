@@ -10,6 +10,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 
+use crate::i18n::{tr, trf};
+
 pub const REPO: &str = "maniacmaik99/ygo-combomaker";
 pub const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const MAX_DOWNLOAD: u64 = 200 * 1024 * 1024;
@@ -78,26 +80,23 @@ fn get(url: &str, token: &str, accept: &str) -> Result<ureq::http::Response<ureq
     }
     match req.call() {
         Ok(r) => Ok(r),
-        Err(ureq::Error::StatusCode(404)) => bail!(
-            "Kein Release gefunden oder kein Zugriff. Bei einem privaten Repo muss unter \
-             „Einstellungen“ ein gültiges GitHub-Token eingetragen sein."
-        ),
+        Err(ureq::Error::StatusCode(404)) => bail!("{}", tr("update.err.not_found")),
         Err(ureq::Error::StatusCode(401)) => {
-            bail!("Das GitHub-Token ist ungültig oder abgelaufen.")
+            bail!("{}", tr("update.err.token_invalid"))
         }
-        Err(e) => Err(e).with_context(|| format!("Anfrage an {url} fehlgeschlagen")),
+        Err(e) => Err(e).with_context(|| trf("err.request_failed", &[&url])),
     }
 }
 
 /// Gibt `Some`, wenn es eine neuere Version mit passender Datei gibt.
 pub fn check(token: &str) -> Result<Option<UpdateInfo>> {
     let Some(asset_name) = asset_name() else {
-        bail!("Für dieses Betriebssystem gibt es keine automatischen Updates.");
+        bail!("{}", tr("update.err.unsupported_os"));
     };
     let url = format!("https://api.github.com/repos/{REPO}/releases/latest");
     let mut resp = get(&url, token, "application/vnd.github+json")?;
     let release: Release = serde_json::from_slice(&resp.body_mut().read_to_vec()?)
-        .context("Antwort von GitHub nicht lesbar")?;
+        .context(tr("update.err.bad_response"))?;
     if !is_newer(&release.tag_name, CURRENT_VERSION) {
         return Ok(None);
     }
@@ -106,9 +105,9 @@ pub fn check(token: &str) -> Result<Option<UpdateInfo>> {
         .iter()
         .find(|a| a.name == asset_name)
         .with_context(|| {
-            format!(
-                "Release {} enthält keine Datei „{asset_name}“.",
-                release.tag_name
+            trf(
+                "update.err.asset_missing",
+                &[&release.tag_name, &asset_name],
             )
         })?;
     Ok(Some(UpdateInfo {
@@ -122,7 +121,7 @@ pub fn check(token: &str) -> Result<Option<UpdateInfo>> {
 /// Lädt das Update herunter und ersetzt das laufende Programm.
 /// Gibt den Pfad zurück, unter dem das neue Programm gestartet werden kann.
 pub fn install(info: &UpdateInfo, token: &str) -> Result<PathBuf> {
-    let exe = std::env::current_exe().context("Pfad des Programms unbekannt")?;
+    let exe = std::env::current_exe().context(tr("update.err.exe_path"))?;
     let (url, accept) = if token.trim().is_empty() {
         (info.download_url.as_str(), "application/octet-stream")
     } else {
@@ -137,10 +136,7 @@ pub fn install(info: &UpdateInfo, token: &str) -> Result<PathBuf> {
         .limit(MAX_DOWNLOAD)
         .read_to_vec()?;
     if bytes.len() < 100_000 {
-        bail!(
-            "Die heruntergeladene Datei ist zu klein ({} Byte). Update abgebrochen.",
-            bytes.len()
-        );
+        bail!("{}", trf("update.err.too_small", &[&bytes.len()]));
     }
 
     let tmp = exe.with_file_name(format!(
@@ -148,14 +144,13 @@ pub fn install(info: &UpdateInfo, token: &str) -> Result<PathBuf> {
         info.version,
         std::env::consts::EXE_SUFFIX
     ));
-    std::fs::write(&tmp, &bytes)
-        .with_context(|| format!("Schreiben von {} fehlgeschlagen", tmp.display()))?;
+    std::fs::write(&tmp, &bytes).with_context(|| trf("err.write_failed", &[&tmp.display()]))?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o755))?;
     }
-    let result = self_replace::self_replace(&tmp).context("Programm konnte nicht ersetzt werden");
+    let result = self_replace::self_replace(&tmp).context(tr("update.err.replace_failed"));
     let _ = std::fs::remove_file(&tmp);
     result?;
     Ok(exe)

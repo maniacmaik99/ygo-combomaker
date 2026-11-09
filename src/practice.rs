@@ -1,69 +1,46 @@
-//! Übungsmodus: Der Nutzer sieht die Starthand und rät Schritt für Schritt,
-//! welche Karten im nächsten Schritt benutzt werden. Danach wird der echte
-//! Schritt aufgedeckt und verglichen. Die Reihenfolge der Karten innerhalb
-//! eines Schritts spielt (noch) keine Rolle.
+//! Üben auf dem Spielfeld: Der Nutzer spielt die Combo Zug für Zug nach.
+//! Jeder Zug wird mit dem nächsten gespeicherten Teil der Combo verglichen.
+//!
+//! Ein Zug ist richtig, wenn
+//! - die Karte stimmt (ein Platzhalter in der Combo passt auf jede Karte) und
+//! - die Aktion stimmt (ist in der Combo keine Aktion eingetragen, passt jede).
+//!
+//! Die Zone wird nicht geprüft: Ob ein Monster links oder rechts liegt, ist
+//! für das Lernen der Combo meist egal.
 
 use uuid::Uuid;
 
-use crate::model::{Combo, Slot, Step};
+use crate::board::{self, Board, Move, MoveError};
+use crate::model::{Action, CardKind, Combo, Entry, Slot};
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct StepCheck {
-    /// Pro Teil des Schritts: wurde die Karte erraten?
-    /// Platzhalter zählen immer als erraten.
-    pub part_hit: Vec<bool>,
-    /// Indizes der geratenen Karten, die in diesem Schritt nicht vorkommen.
-    pub wrong_guesses: Vec<usize>,
+pub enum Verdict {
+    Correct,
+    Wrong,
 }
 
-impl StepCheck {
-    pub fn is_correct(&self) -> bool {
-        self.part_hit.iter().all(|h| *h) && self.wrong_guesses.is_empty()
-    }
-}
-
-pub fn check_step(step: &Step, guesses: &[Slot]) -> StepCheck {
-    let mut used = vec![false; guesses.len()];
-    let part_hit = step
-        .parts
-        .iter()
-        .map(|part| match part.entry.slot.card_id() {
-            None => true,
-            Some(id) => {
-                let found = guesses
-                    .iter()
-                    .enumerate()
-                    .position(|(i, g)| !used[i] && g.card_id() == Some(id));
-                if let Some(i) = found {
-                    used[i] = true;
-                    true
-                } else {
-                    false
-                }
-            }
-        })
-        .collect();
-    let wrong_guesses = used
-        .iter()
-        .enumerate()
-        .filter(|(_, u)| !**u)
-        .map(|(i, _)| i)
-        .collect();
-    StepCheck {
-        part_hit,
-        wrong_guesses,
-    }
+pub fn move_matches(expected: &Entry, mv: &Move) -> bool {
+    let card_ok = match (&expected.slot, &mv.slot) {
+        (Slot::Placeholder { .. }, _) => true,
+        (Slot::Card { id: a, .. }, Slot::Card { id: b, .. }) => a == b,
+        _ => false,
+    };
+    let action_ok = expected.action == Action::None || expected.action == mv.action;
+    card_ok && action_ok
 }
 
 pub struct Session {
     pub combo_id: Uuid,
-    /// Index des aktuellen Schritts.
-    pub current: usize,
-    pub guesses: Vec<Slot>,
-    /// `Some`, sobald der aktuelle Schritt geprüft oder aufgedeckt wurde.
-    pub checked: Option<StepCheck>,
-    /// Ergebnis pro bereits abgeschlossenem Schritt.
+    pub board: Board,
+    /// (Schritt, Teil) aller Teile der Combo in Reihenfolge.
+    flat: Vec<(usize, usize)>,
+    /// Index in `flat` des nächsten erwarteten Teils.
+    pos: usize,
+    /// Pro erledigtem Teil: beim ersten Versuch richtig?
     pub results: Vec<bool>,
+    /// Beim aktuellen Teil gab es schon einen Fehler.
+    current_failed: bool,
+    pub mistakes: u32,
     pub show_endboard: bool,
     pub stats_saved: bool,
 }
@@ -72,42 +49,32 @@ impl Session {
     pub fn new(combo: &Combo) -> Self {
         Self {
             combo_id: combo.id,
-            current: 0,
-            guesses: Vec::new(),
-            checked: None,
+            board: Board::with_hand(&combo.starting_hand),
+            flat: board::flatten(&combo.steps),
+            pos: 0,
             results: Vec::new(),
+            current_failed: false,
+            mistakes: 0,
             show_endboard: true,
             stats_saved: false,
         }
     }
 
-    pub fn finished(&self, combo: &Combo) -> bool {
-        self.current >= combo.steps.len()
+    pub fn total(&self) -> usize {
+        self.flat.len()
     }
 
-    /// Prüft die geratenen Karten gegen den aktuellen Schritt.
-    pub fn check(&mut self, combo: &Combo) {
-        if let Some(step) = combo.steps.get(self.current) {
-            self.checked = Some(check_step(step, &self.guesses));
-        }
+    pub fn done(&self) -> usize {
+        self.pos
     }
 
-    /// Deckt den Schritt ohne Raten auf. Zählt als falsch.
-    pub fn reveal(&mut self, combo: &Combo) {
-        if let Some(step) = combo.steps.get(self.current) {
-            self.checked = Some(StepCheck {
-                part_hit: vec![false; step.parts.len()],
-                wrong_guesses: (0..self.guesses.len()).collect(),
-            });
-        }
+    pub fn finished(&self) -> bool {
+        self.pos >= self.flat.len()
     }
 
-    pub fn next(&mut self) {
-        if let Some(check) = self.checked.take() {
-            self.results.push(check.is_correct());
-            self.current += 1;
-            self.guesses.clear();
-        }
+    /// (Schritt, Teil) des nächsten erwarteten Zugs.
+    pub fn current(&self) -> Option<(usize, usize)> {
+        self.flat.get(self.pos).copied()
     }
 
     pub fn correct_count(&self) -> usize {
@@ -120,80 +87,156 @@ impl Session {
         }
         ((self.correct_count() * 100) / self.results.len()) as u8
     }
+
+    fn expected<'a>(&self, combo: &'a Combo) -> Option<&'a Entry> {
+        let (si, pi) = self.current()?;
+        Some(&combo.steps.get(si)?.parts.get(pi)?.entry)
+    }
+
+    fn advance(&mut self, correct_first_try: bool) {
+        self.results.push(correct_first_try);
+        self.current_failed = false;
+        self.pos += 1;
+    }
+
+    /// Prüft einen Zug. Ist er richtig, wird er auf dem Feld ausgeführt.
+    /// Ein Fehler beim Ausführen (z. B. Zone belegt) zählt nicht als falsch.
+    pub fn submit(
+        &mut self,
+        combo: &Combo,
+        mv: &Move,
+        kind: CardKind,
+    ) -> Result<Verdict, MoveError> {
+        let Some(expected) = self.expected(combo) else {
+            return Ok(Verdict::Correct);
+        };
+        if !move_matches(expected, mv) {
+            self.current_failed = true;
+            self.mistakes += 1;
+            return Ok(Verdict::Wrong);
+        }
+        self.board.apply(mv, kind)?;
+        let ok = !self.current_failed;
+        self.advance(ok);
+        Ok(Verdict::Correct)
+    }
+
+    /// Zeigt den erwarteten Zug, führt ihn aus und zählt ihn als falsch.
+    /// `card_info` liefert zu einer Karte die Kartenart und ob sie ins
+    /// Extra Deck gehört.
+    pub fn reveal(
+        &mut self,
+        combo: &Combo,
+        card_info: impl Fn(&Slot) -> (CardKind, bool),
+    ) -> Option<Move> {
+        let expected = self.expected(combo)?.clone();
+        let (kind, extra) = card_info(&expected.slot);
+        let mv = board::part_to_move(&self.board, &expected, kind, extra);
+        // Klappt der Zug nicht (z. B. Zone fehlt), geht es trotzdem weiter.
+        let _ = self.board.apply(&mv, kind);
+        self.advance(false);
+        Some(mv)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{CardKind, Connector, Entry, StepPart};
+    use crate::board::Area;
+    use crate::model::{CardKind, Connector, Step, StepPart};
 
     fn card(id: u32) -> Slot {
         Slot::Card {
             id,
             image_id: id,
-            name: format!("Karte {id}"),
+            name: format!("C{id}"),
         }
     }
 
-    fn step(slots: Vec<Slot>) -> Step {
-        Step {
-            parts: slots
-                .into_iter()
-                .map(|s| StepPart {
+    fn combo() -> Combo {
+        let mut c = Combo::new("x");
+        c.starting_hand = vec![Entry::new(card(1))];
+        c.steps = vec![Step {
+            parts: vec![
+                StepPart {
                     connector: Connector::Then,
-                    entry: Entry::new(s),
-                })
-                .collect(),
+                    entry: Entry {
+                        action: Action::NormalSummon,
+                        ..Entry::new(card(1))
+                    },
+                },
+                StepPart {
+                    connector: Connector::Then,
+                    entry: Entry {
+                        action: Action::Search,
+                        ..Entry::new(card(2))
+                    },
+                },
+            ],
             note: String::new(),
-        }
+        }];
+        c
     }
 
     #[test]
-    fn correct_in_any_order() {
-        let s = step(vec![card(1), card(2)]);
-        let r = check_step(&s, &[card(2), card(1)]);
-        assert!(r.is_correct());
-    }
-
-    #[test]
-    fn missing_and_wrong_cards() {
-        let s = step(vec![card(1), card(2)]);
-        let r = check_step(&s, &[card(1), card(3)]);
-        assert_eq!(r.part_hit, vec![true, false]);
-        assert_eq!(r.wrong_guesses, vec![1]);
-        assert!(!r.is_correct());
-    }
-
-    #[test]
-    fn duplicates_need_two_guesses() {
-        let s = step(vec![card(1), card(1)]);
-        assert!(!check_step(&s, &[card(1)]).is_correct());
-        assert!(check_step(&s, &[card(1), card(1)]).is_correct());
-    }
-
-    #[test]
-    fn placeholders_always_hit() {
-        let s = step(vec![
-            card(1),
-            Slot::Placeholder {
-                kind: CardKind::Monster,
-                label: "3 other lunas".into(),
-            },
-        ]);
-        assert!(check_step(&s, &[card(1)]).is_correct());
-    }
-
-    #[test]
-    fn session_flow() {
-        let mut combo = Combo::new("x");
-        combo.steps = vec![step(vec![card(1)]), step(vec![card(2)])];
-        let mut s = Session::new(&combo);
-        s.guesses.push(card(1));
-        s.check(&combo);
-        s.next();
-        s.reveal(&combo);
-        s.next();
-        assert!(s.finished(&combo));
+    fn correct_and_wrong_moves() {
+        let c = combo();
+        let mut s = Session::new(&c);
+        let wrong = Move {
+            slot: card(1),
+            from: Area::Hand,
+            action: Action::SpecialSummon,
+            to: Some(Area::Monster(2)),
+        };
+        assert_eq!(s.submit(&c, &wrong, CardKind::Monster), Ok(Verdict::Wrong));
+        let right = Move {
+            action: Action::NormalSummon,
+            ..wrong
+        };
+        assert_eq!(
+            s.submit(&c, &right, CardKind::Monster),
+            Ok(Verdict::Correct)
+        );
+        assert_eq!(s.results, vec![false]);
+        let search = Move {
+            slot: card(2),
+            from: Area::Deck,
+            action: Action::Search,
+            to: Some(Area::Hand),
+        };
+        assert_eq!(
+            s.submit(&c, &search, CardKind::Monster),
+            Ok(Verdict::Correct)
+        );
+        assert!(s.finished());
         assert_eq!(s.percent(), 50);
+    }
+
+    #[test]
+    fn reveal_applies_expected_move() {
+        let c = combo();
+        let mut s = Session::new(&c);
+        let mv = s.reveal(&c, |_| (CardKind::Monster, false)).unwrap();
+        assert_eq!(mv.action, Action::NormalSummon);
+        assert!(matches!(s.board.find(&card(1)), Some(Area::Monster(_))));
+        s.reveal(&c, |_| (CardKind::Monster, false));
+        assert_eq!(s.board.find(&card(2)), Some(Area::Hand));
+        assert!(s.finished());
+        assert_eq!(s.percent(), 0);
+    }
+
+    #[test]
+    fn placeholder_and_missing_action_match_anything() {
+        let e = Entry::new(Slot::Placeholder {
+            kind: CardKind::Monster,
+            label: "Any".into(),
+        });
+        let mv = Move {
+            slot: card(9),
+            from: Area::Hand,
+            action: Action::Discard,
+            to: None,
+        };
+        assert!(move_matches(&e, &mv));
     }
 }

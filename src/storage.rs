@@ -19,7 +19,7 @@ pub struct Paths {
 impl Paths {
     pub fn detect() -> Result<Self> {
         let dirs = directories::ProjectDirs::from("", "", "ygo-combomaker")
-            .context("Kein Benutzerverzeichnis gefunden")?;
+            .context(crate::i18n::tr("err.no_user_dir"))?;
         let p = Paths {
             data_dir: dirs.data_dir().to_path_buf(),
             cache_dir: dirs.cache_dir().to_path_buf(),
@@ -49,22 +49,26 @@ impl Paths {
 #[derive(Serialize, Deserialize, Clone, PartialEq)]
 #[serde(default)]
 pub struct Settings {
-    /// Kartennamen auf Deutsch anzeigen (falls vorhanden).
-    pub german_names: bool,
+    /// Sprache der Oberfläche. `None` = beim ersten Start aus dem System.
+    pub lang: Option<crate::i18n::Lang>,
+    /// Kartennamen in der Sprache der Oberfläche zeigen (falls vorhanden).
+    pub localized_card_names: bool,
     /// In der Suche nur Karten zeigen, die es in Master Duel gibt.
     pub md_only: bool,
     /// Kartenbreite in Pixeln im Editor.
     pub card_width: f32,
     /// Beim Start automatisch nach Updates suchen.
     pub auto_update_check: bool,
-    /// GitHub-Token für Updates aus einem privaten Repo (nur Leserecht nötig).
+    /// Alt: GitHub-Token für Updates aus dem damals privaten Repo.
+    /// Wird nicht mehr angezeigt, aber noch benutzt, falls vorhanden.
     pub github_token: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            german_names: false,
+            lang: None,
+            localized_card_names: false,
             md_only: true,
             card_width: 72.0,
             auto_update_check: true,
@@ -88,7 +92,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
 fn load_json<T: for<'de> Deserialize<'de> + Default>(path: &Path) -> Result<T> {
     match std::fs::read(path) {
         Ok(bytes) => serde_json::from_slice(&bytes)
-            .with_context(|| format!("{} ist beschädigt", path.display())),
+            .with_context(|| crate::i18n::trf("err.file_corrupt", &[&path.display()])),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
         Err(e) => Err(e.into()),
     }
@@ -130,7 +134,7 @@ pub fn combo_to_share_text(combo: &Combo) -> Result<String> {
 /// damit sie keine vorhandene Combo überschreibt.
 pub fn combo_from_share_text(text: &str) -> Result<Combo> {
     let mut combo: Combo =
-        serde_json::from_str(text.trim()).context("Text ist keine gültige Combo")?;
+        serde_json::from_str(text.trim()).context(crate::i18n::tr("err.invalid_combo_text"))?;
     combo.id = uuid::Uuid::new_v4();
     combo.practice = Default::default();
     Ok(combo)

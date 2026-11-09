@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=YGO Combomaker
+Comment=Yu-Gi-Oh!-Combos eintragen und üben
+Exec=ygo-combomaker
+Icon=ygo-combomaker
+Terminal=false
+Categories=Game;
+StartupWMClass=ygo-combomaker

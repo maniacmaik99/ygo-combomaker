@@ -20,28 +20,19 @@ Kartentexte und -bilder: © Konami / 4K Media. Diese App ist nicht mit Konami od
 
 Fertige Programme für Linux und Windows liegen unter „Releases“ im GitHub-Repo:
 
-- Linux: `ygo-combomaker-linux-x86_64` herunterladen, ausführbar machen (`chmod +x ygo-combomaker-linux-x86_64`), starten.
-- Windows: `ygo-combomaker-windows-x86_64.exe` herunterladen und starten.
+- Linux: `ygo-combomaker-linux-x86_64` herunterladen, ausführbar machen (`chmod +x ygo-combomaker-linux-x86_64`), starten. Für einen Eintrag im Startmenü: Datei als `ygo-combomaker` in einen Ordner im `PATH` legen, `assets/ygo-combomaker.desktop` nach `~/.local/share/applications/` und `assets/icon-512.png` als `~/.local/share/icons/hicolor/512x512/apps/ygo-combomaker.png` kopieren.
+- Windows: `ygo-combomaker-windows-x86_64.exe` herunterladen und starten. Die Datei hat das App-Logo als Symbol.
 
 ## Updates
 
 Der Knopf „Update“ oben in der App sucht auf GitHub nach einem neueren Release. Wenn es eins gibt, lädt die App die passende Datei herunter, ersetzt sich selbst und startet neu. Optional prüft die App das auch beim Start (Einstellungen).
-
-Solange das Repo **privat** ist, braucht die App dafür ein GitHub-Token (4 Schritte):
-
-1. https://github.com/settings/personal-access-tokens/new öffnen.
-2. „Repository access“: „Only select repositories“ → `ygo-combomaker`.
-3. „Permissions“ → „Repository permissions“ → „Contents“: „Read-only“. Token erstellen.
-4. Token in der App unter „Einstellungen“ → „GitHub-Token“ einfügen.
-
-Das Token wird unverschlüsselt in `settings.json` gespeichert. Es hat nur Leserecht für dieses eine Repo.
 
 ## Neue Version veröffentlichen (2 Schritte)
 
 1. In `Cargo.toml` die Version erhöhen, z. B. `0.2.0`.
 2. Committen und auf `main` pushen.
 
-GitHub Actions merkt, dass es für diese Version noch kein Release gibt, baut Linux- und Windows-Version und legt das Release `v0.2.0` an (Datei `.github/workflows/release.yml`). Das dauert etwa 10 Minuten.
+GitHub Actions merkt, dass es für diese Version noch kein Release gibt, baut Linux- und Windows-Version und legt das Release `v0.2.0` an (Datei `.github/workflows/release.yml`). Das dauert etwa 13 Minuten.
 
 ## Selbst bauen
 
@@ -60,28 +51,32 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | Combos, Einstellungen | `~/.local/share/ygo-combomaker/` | `%APPDATA%\ygo-combomaker\data\` |
 | Kartendatenbank, Bilder | `~/.cache/ygo-combomaker/` | `%LOCALAPPDATA%\ygo-combomaker\cache\` |
 
-## Funktionen (Stand 0.3)
+## Funktionen (Stand 0.4)
 
-- Combo anlegen: Titel, Deck, Autor, Notizen
-- Bereiche: Starthand, Endboard, „Spielt um“ (Handtraps), Benötigte Karten, Schritte
-- Karten über die Suche (englischer oder deutscher Name) oder als Platzhalter („Any Card“, „discard“)
-- Pro Karte: Aktion (Effekt, Normal-/Spezialbeschwörung, Suchen, Abwerfen, vom Friedhof auf die Hand, Setzen, Friedhof, Verbannen, Kettenglied 1–6), Zone (Monsterzone, Extra-Monsterzone/Link-Zone, Zauber-/Fallenzone, Pendelzone links/rechts, Feldzauberzone), Lage (offen/verdeckt) und Notiz
-- Decklisten: aus einem Archetyp füllen oder importieren (ydke-Link, YDK-Datei, Kartenliste als Text). Eine Combo kann mit einer Deckliste verknüpft werden; deren Karten stehen beim Eintragen ganz oben und sind mit einem Klick auswählbar
-- Schritte mit Zeichen zwischen den Karten: → ← + = (anklicken zum Ändern)
-- Übungsmodus: Karten pro Schritt raten, prüfen, Ergebnis in Prozent, bestes Ergebnis wird gespeichert
-- Teilen: Combo als Text in die Zwischenablage kopieren, mit „Importieren“ wieder einfügen
+- **Sprachen:** Englisch, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch (Einstellungen → Sprache). Kartennamen optional in der gewählten Sprache (außer Spanisch, das bietet die Kartendatenbank nicht an).
+- **Combo eintragen auf dem Spielfeld:** Starthand festlegen, dann die Combo spielen: Karte anklicken → Aktion wählen → falls nötig Zielzone anklicken. Jeder Zug wird gespeichert. „Neuer Schritt“ trennt Schritte, „Letzten Zug rückgängig“, „Feld als Endboard übernehmen“.
+- **Combo eintragen als Liste:** alle Bereiche (Starthand, Endboard, Handtraps, benötigte Karten, Schritte) Karte für Karte bearbeiten.
+- **Spielfeld:** 5 Monsterzonen, 2 Extra-Monsterzonen, 5 Zauber-/Fallenzonen, Pendelzonen links/rechts, Feldzauberzone, Friedhof, Verbannt, Xyz-Material, Extra Deck (offen), Hand. Karten aus Deck und Extra Deck holen.
+- **Aktionen (38):** Effekt aktivieren, Kettenglied (frei wählbare Nummer), in die Pendelzone legen, Zauber/Falle setzen, offen auf das Feld legen, Ausrüsten; Normal-, Tribut-, Flipp-, Spezial-, Fusions-, Ritual-, Synchro-, Xyz-, Pendel- und Linkbeschwörung, Monster verdeckt setzen; Tribut, Material, Xyz-Material an-/abhängen, Abwerfen; Suchen (auf Hand oder Friedhof), Ziehen, Friedhof, Verbannen, Zerstören, zurück auf die Hand, Friedhof → Hand/Deck, verbannt → Hand/Friedhof, zurück ins Deck/Extra Deck, Aufdecken; Annullieren, Ziel wählen, Kampfposition ändern.
+- **Üben auf dem Spielfeld:** Die Combo Zug für Zug nachspielen. Nach jedem Zug: richtig oder falsch. „Lösung zeigen“ spielt den nächsten Zug vor. Ergebnis in Prozent, bestes Ergebnis wird gespeichert.
+- **Decklisten:** aus einem Archetyp füllen oder importieren (ydke-Link, YDK-Datei, Kartenliste). Eine Combo kann mit einer Deckliste verknüpft werden; deren Karten stehen beim Hinzufügen ganz oben.
+- **Teilen:** Combo als Text in die Zwischenablage kopieren, mit „Importieren“ wieder einfügen.
 
 ## Aufbau des Codes
 
 | Datei | Inhalt |
 |---|---|
-| `src/model.rs` | Datenmodell (Combo, Schritt, Karte, Aktion) |
+| `src/model.rs` | Datenmodell (Combo, Schritt, Karte, Aktion, Zone) |
 | `src/cards.rs` | Kartendatenbank, YGOPRODeck-API, Suche |
 | `src/images.rs` | Bilder laden und zwischenspeichern (Hintergrund-Threads) |
 | `src/decks.rs` | Decklisten importieren (ydke, YDK, Kartenliste) |
 | `src/storage.rs` | Speicherorte, Laden/Speichern, Teilen |
-| `src/practice.rs` | Logik des Übungsmodus |
+| `src/board.rs` | Spielfeld-Logik: Zonen, Züge, Ziel jeder Aktion |
+| `src/practice.rs` | Logik des Übungsmodus (Züge prüfen) |
 | `src/updater.rs` | Update über GitHub Releases |
-| `src/app.rs` | Oberfläche |
+| `src/i18n/` | Übersetzungen (eine Datei pro Sprache) |
+| `src/theme.rs` | Farben und Stil der Oberfläche |
+| `src/app/` | Oberfläche (Editor, Spielfeld, Üben, Decks, Kartensuche) |
+| `assets/` | Logo (`make_icon.py` erzeugt es neu), Desktop-Datei für Linux |
 
 Tests: `cargo test`
