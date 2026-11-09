@@ -4,6 +4,7 @@ version = "0.4.0"
 edition = "2024"
 description = "Desktop-App zum Eintragen und Üben von Yu-Gi-Oh!-Combos"
 license = "MIT"
+repository = "https://github.com/maniacmaik99/ygo-combomaker"
 
 [dependencies]
 eframe = "0.37"
