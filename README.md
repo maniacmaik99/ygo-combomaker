@@ -60,12 +60,13 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | Combos, Einstellungen | `~/.local/share/ygo-combomaker/` | `%APPDATA%\ygo-combomaker\data\` |
 | Kartendatenbank, Bilder | `~/.cache/ygo-combomaker/` | `%LOCALAPPDATA%\ygo-combomaker\cache\` |
 
-## Funktionen (Stand 0.1)
+## Funktionen (Stand 0.2)
 
 - Combo anlegen: Titel, Deck, Autor, Notizen
 - Bereiche: Starthand, Endboard, „Spielt um“ (Handtraps), Benötigte Karten, Schritte
 - Karten über die Suche (englischer oder deutscher Name) oder als Platzhalter („Any Card“, „discard“)
-- Pro Karte: Aktion (Effekt, Normal-/Spezialbeschwörung, Setzen, Friedhof, Verbannen, Kettenglied 1–6) und Notiz
+- Pro Karte: Aktion (Effekt, Normal-/Spezialbeschwörung, Suchen, Abwerfen, Setzen, Friedhof, Verbannen, Kettenglied 1–6) und Notiz
+- Decklisten: aus einem Archetyp füllen oder importieren (ydke-Link, YDK-Datei, Kartenliste als Text). Eine Combo kann mit einer Deckliste verknüpft werden; deren Karten stehen beim Eintragen ganz oben und sind mit einem Klick auswählbar
 - Schritte mit Zeichen zwischen den Karten: → ← + = (anklicken zum Ändern)
 - Übungsmodus: Karten pro Schritt raten, prüfen, Ergebnis in Prozent, bestes Ergebnis wird gespeichert
 - Teilen: Combo als Text in die Zwischenablage kopieren, mit „Importieren“ wieder einfügen
@@ -77,6 +78,7 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | `src/model.rs` | Datenmodell (Combo, Schritt, Karte, Aktion) |
 | `src/cards.rs` | Kartendatenbank, YGOPRODeck-API, Suche |
 | `src/images.rs` | Bilder laden und zwischenspeichern (Hintergrund-Threads) |
+| `src/decks.rs` | Decklisten importieren (ydke, YDK, Kartenliste) |
 | `src/storage.rs` | Speicherorte, Laden/Speichern, Teilen |
 | `src/practice.rs` | Logik des Übungsmodus |
 | `src/updater.rs` | Update über GitHub Releases |

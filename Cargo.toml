@@ -1,6 +1,6 @@
 [package]
 name = "ygo-combomaker"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Desktop-App zum Eintragen und Üben von Yu-Gi-Oh!-Combos"
 license = "MIT"
@@ -16,6 +16,7 @@ directories = "6"
 uuid = { version = "1", features = ["v4", "serde"] }
 anyhow = "1"
 self-replace = "1.5.1"
+base64 = "0.23.1"
 
 [profile.release]
 lto = "thin"

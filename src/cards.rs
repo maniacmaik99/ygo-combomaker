@@ -31,6 +31,9 @@ pub struct Card {
     pub desc: String,
     #[serde(default)]
     pub in_master_duel: bool,
+    /// IDs alternativer Artworks. Decklisten (YDK) enthalten manchmal diese IDs.
+    #[serde(default)]
+    pub alt_ids: Vec<u32>,
 }
 
 impl Card {
@@ -86,12 +89,15 @@ impl CardDb {
                 key
             })
             .collect();
-        self.by_id = self
-            .cards
-            .iter()
-            .enumerate()
-            .map(|(i, c)| (c.id, i))
-            .collect();
+        self.by_id.clear();
+        for (i, c) in self.cards.iter().enumerate() {
+            for alt in &c.alt_ids {
+                self.by_id.entry(*alt).or_insert(i);
+            }
+        }
+        for (i, c) in self.cards.iter().enumerate() {
+            self.by_id.insert(c.id, i);
+        }
         self.has_md_info = self.cards.iter().any(|c| c.in_master_duel);
     }
 
@@ -101,6 +107,38 @@ impl CardDb {
 
     pub fn get(&self, id: u32) -> Option<&Card> {
         self.by_id.get(&id).map(|&i| &self.cards[i])
+    }
+
+    /// Sucht eine Karte über den genauen Namen (englisch oder deutsch,
+    /// Groß-/Kleinschreibung egal).
+    pub fn find_by_name(&self, name: &str) -> Option<&Card> {
+        let name = name.trim().to_lowercase();
+        self.cards.iter().find(|c| {
+            c.name.to_lowercase() == name
+                || c.name_de.as_ref().is_some_and(|d| d.to_lowercase() == name)
+        })
+    }
+
+    /// Alle Archetypen, alphabetisch sortiert.
+    pub fn archetypes(&self) -> Vec<String> {
+        let mut v: Vec<String> = self
+            .cards
+            .iter()
+            .filter_map(|c| c.archetype.clone())
+            .collect();
+        v.sort();
+        v.dedup();
+        v
+    }
+
+    /// Alle Karten eines Archetyps.
+    pub fn cards_of_archetype(&self, archetype: &str, md_only: bool) -> Vec<&Card> {
+        let md_only = md_only && self.has_md_info;
+        self.cards
+            .iter()
+            .filter(|c| c.archetype.as_deref() == Some(archetype))
+            .filter(|c| !md_only || c.in_master_duel)
+            .collect()
     }
 
     /// Sucht Karten, deren englischer oder deutscher Name alle Suchwörter
@@ -220,6 +258,7 @@ pub fn parse_api_cards(json: &[u8]) -> Result<Vec<Card>> {
                 archetype: c.archetype,
                 desc: c.desc,
                 in_master_duel: in_md,
+                alt_ids: c.card_images.iter().skip(1).map(|i| i.id).collect(),
             }
         })
         .collect())
@@ -324,6 +363,10 @@ mod tests {
         // Master-Duel-Filter.
         assert!(db.search("poly", true, 10).is_empty());
         assert_eq!(db.get(46986414).unwrap().name, "Dark Magician");
+        // Alternatives Artwork führt zur gleichen Karte.
+        assert_eq!(db.get(36996508).unwrap().id, 46986414);
+        assert_eq!(db.find_by_name("POLYMERISATION").unwrap().id, 24094653);
+        assert_eq!(db.archetypes(), vec!["Dark Magician".to_string()]);
     }
 
     #[test]

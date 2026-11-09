@@ -12,8 +12,11 @@ use egui::{
 };
 
 use crate::cards::{self, CardDb, CardDbFile};
+use crate::decks;
 use crate::images::ImageCache;
-use crate::model::{Action, CardKind, Combo, Connector, Entry, Section, Slot, Step, StepPart};
+use crate::model::{
+    Action, CardKind, Combo, Connector, Deck, Entry, Section, Slot, Step, StepPart,
+};
 use crate::practice::Session;
 use crate::storage::{self, Paths, Settings};
 use crate::updater::{self, UpdateInfo};
@@ -27,6 +30,7 @@ const BAD_COLOR: Color32 = Color32::from_rgb(230, 70, 70);
 enum View {
     Edit,
     Practice,
+    Decks,
 }
 
 /// Wohin eine Karte aus der Suche hinzugefügt wird.
@@ -35,6 +39,7 @@ enum Target {
     Section(Section),
     Step(usize),
     PracticeGuess,
+    Deck,
 }
 
 /// Welche Karte im Editor ausgewählt ist.
@@ -93,6 +98,12 @@ pub struct ComboApp {
     last_change: Instant,
     import_text: Option<String>,
     confirm_delete: Option<usize>,
+    decks: Vec<Deck>,
+    selected_deck: Option<usize>,
+    /// Name und Text für den Deck-Import.
+    deck_import: Option<(String, String)>,
+    archetype_query: String,
+    confirm_delete_deck: Option<usize>,
     message: Option<String>,
     update: UpdateState,
     update_rx: Option<Receiver<UpdateMsg>>,
@@ -103,6 +114,7 @@ pub struct ComboApp {
 impl ComboApp {
     pub fn new(cc: &eframe::CreationContext<'_>, paths: Paths) -> Self {
         let settings = storage::load_settings(&paths);
+        let decks = storage::load_decks(&paths).unwrap_or_default();
         let (combos, message) = match storage::load_combos(&paths) {
             Ok(c) => (c, None),
             Err(e) => (
@@ -129,6 +141,11 @@ impl ComboApp {
             last_change: Instant::now(),
             import_text: None,
             confirm_delete: None,
+            selected_deck: if decks.is_empty() { None } else { Some(0) },
+            decks,
+            deck_import: None,
+            archetype_query: String::new(),
+            confirm_delete_deck: None,
             message,
             update: UpdateState::Idle,
             update_rx: None,
@@ -389,7 +406,9 @@ impl ComboApp {
     }
 
     fn save_now(&mut self) {
-        match storage::save_combos(&self.paths, &self.combos) {
+        let result = storage::save_combos(&self.paths, &self.combos)
+            .and_then(|_| storage::save_decks(&self.paths, &self.decks));
+        match result {
             Ok(()) => self.dirty = false,
             Err(e) => self.message = Some(format!("Speichern fehlgeschlagen: {e:#}")),
         }
@@ -423,6 +442,13 @@ impl ComboApp {
             }
             return;
         }
+        if target == Target::Deck {
+            if let (Some(i), Slot::Card { id, image_id, name }) = (self.selected_deck, &slot) {
+                self.decks[i].add(*id, *image_id, name, 1);
+                self.mark_dirty();
+            }
+            return;
+        }
         let Some(idx) = self.selected else { return };
         let combo = &mut self.combos[idx];
         match target {
@@ -435,7 +461,7 @@ impl ComboApp {
                     });
                 }
             }
-            Target::PracticeGuess => {}
+            Target::PracticeGuess | Target::Deck => {}
         }
         self.mark_dirty();
     }
@@ -589,18 +615,23 @@ impl eframe::App for ComboApp {
         self.images.poll(&ctx);
 
         egui::Panel::top("top_bar").show(ui, |ui| self.top_bar(ui));
-        egui::Panel::left("combo_list")
-            .resizable(true)
-            .default_size(230.0)
-            .show(ui, |ui| self.combo_list(ui));
+        if self.view != View::Decks {
+            egui::Panel::left("combo_list")
+                .resizable(true)
+                .default_size(230.0)
+                .show(ui, |ui| self.combo_list(ui));
+        }
         egui::CentralPanel::default().show(ui, |ui| match self.view {
             View::Edit => self.editor(ui),
             View::Practice => self.practice(ui),
+            View::Decks => self.decks_view(ui),
         });
 
         self.picker_window(&ctx);
         self.import_window(&ctx);
         self.delete_window(&ctx);
+        self.deck_import_window(&ctx);
+        self.delete_deck_window(&ctx);
         self.message_window(&ctx);
         self.poll_update();
         self.update_window(&ctx);
@@ -615,6 +646,7 @@ impl ComboApp {
             ui.separator();
             ui.selectable_value(&mut self.view, View::Edit, "Bearbeiten");
             ui.selectable_value(&mut self.view, View::Practice, "Üben");
+            ui.selectable_value(&mut self.view, View::Decks, "Decks");
             ui.separator();
             ui.menu_button("Einstellungen", |ui| {
                 ui.checkbox(
@@ -773,6 +805,40 @@ impl ComboApp {
                                     .desired_width(400.0),
                             )
                             .changed();
+                        ui.end_row();
+                        ui.label("Deckliste");
+                        let current = c
+                            .deck_id
+                            .and_then(|id| self.decks.iter().find(|d| d.id == id))
+                            .map(|d| d.name.clone())
+                            .unwrap_or_else(|| "(keine)".into());
+                        ui.horizontal(|ui| {
+                            egui::ComboBox::from_id_salt("combo_deck")
+                                .selected_text(current)
+                                .width(250.0)
+                                .show_ui(ui, |ui| {
+                                    changed |= ui
+                                        .selectable_value(&mut c.deck_id, None, "(keine)")
+                                        .changed();
+                                    for d in &self.decks {
+                                        if ui
+                                            .selectable_value(&mut c.deck_id, Some(d.id), &d.name)
+                                            .changed()
+                                        {
+                                            changed = true;
+                                            if c.deck.is_empty() {
+                                                c.deck = d.name.clone();
+                                            }
+                                        }
+                                    }
+                                });
+                            ui.label(
+                                RichText::new(
+                                    "Karten der Deckliste stehen beim Hinzufügen ganz oben.",
+                                )
+                                .weak(),
+                            );
+                        });
                         ui.end_row();
                         ui.label("Autor");
                         changed |= ui
@@ -1375,7 +1441,15 @@ impl ComboApp {
         let db = &self.db;
         let title = match picker.target {
             Target::PracticeGuess => "Karte raten",
+            Target::Deck => "Karte zum Deck hinzufügen",
             _ => "Karte hinzufügen",
+        };
+        let deck = match picker.target {
+            Target::Deck => None,
+            _ => self
+                .selected
+                .and_then(|i| self.combos[i].deck_id)
+                .and_then(|id| self.decks.iter().find(|d| d.id == id)),
         };
         egui::Window::new(title)
             .open(&mut open)
@@ -1400,6 +1474,38 @@ impl ComboApp {
                 }
                 ui.checkbox(md_only, "Nur Master-Duel-Karten");
 
+                if let Some(deck) = deck {
+                    let q = picker.query.trim().to_lowercase();
+                    let cards: Vec<_> = deck
+                        .cards
+                        .iter()
+                        .filter(|c| {
+                            q.is_empty()
+                                || c.name.to_lowercase().contains(&q)
+                                || db
+                                    .get(c.id)
+                                    .and_then(|x| x.name_de.as_ref())
+                                    .is_some_and(|d| d.to_lowercase().contains(&q))
+                        })
+                        .collect();
+                    ui.label(RichText::new(format!("Aus Deckliste „{}“ (Klick = hinzufügen):", deck.name)).strong());
+                    egui::ScrollArea::vertical()
+                        .id_salt("deck_cards")
+                        .max_height(260.0)
+                        .show(ui, |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                for c in cards {
+                                    let slot = c.to_slot();
+                                    if card_widget(ui, images, db, german, &slot, Action::None, 56.0, None).clicked() {
+                                        chosen = Some(slot);
+                                    }
+                                }
+                            });
+                        });
+                    ui.separator();
+                    ui.label(RichText::new("Alle Karten:").strong());
+                }
+
                 let results = db.search(&picker.query, *md_only, 60);
                 if db.is_empty() {
                     ui.label("Die Kartendatenbank ist noch nicht geladen.");
@@ -1415,7 +1521,7 @@ impl ComboApp {
                         picker.focus_requested = false;
                     }
 
-                egui::ScrollArea::vertical().max_height(380.0).show(ui, |ui| {
+                egui::ScrollArea::vertical().id_salt("search_results").max_height(380.0).show(ui, |ui| {
                     for card in &results {
                         ui.horizontal(|ui| {
                             let slot = card.to_slot();
@@ -1432,7 +1538,7 @@ impl ComboApp {
                     }
                 });
 
-                if picker.target != Target::PracticeGuess {
+                if !matches!(picker.target, Target::PracticeGuess | Target::Deck) {
                     ui.separator();
                     ui.label("Oder Platzhalter (z. B. „Any Card“, „discard“):");
                     ui.horizontal(|ui| {
@@ -1587,4 +1693,279 @@ fn step_row(
             entry_view(ui, images, db, german, &part.entry, width, hl);
         }
     });
+}
+
+// ---------------------------------------------------------------------------
+// Decks
+// ---------------------------------------------------------------------------
+
+impl ComboApp {
+    fn decks_view(&mut self, ui: &mut egui::Ui) {
+        egui::Panel::left("deck_list")
+            .resizable(true)
+            .default_size(200.0)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("+ Neues Deck").clicked() {
+                        self.decks.push(Deck::new("Neues Deck"));
+                        self.selected_deck = Some(self.decks.len() - 1);
+                        self.mark_dirty();
+                    }
+                    if ui
+                        .button("Importieren")
+                        .on_hover_text("ydke-Link, YDK-Datei oder Kartenliste einfügen")
+                        .clicked()
+                    {
+                        self.deck_import = Some((String::new(), String::new()));
+                    }
+                });
+                ui.separator();
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    for (i, d) in self.decks.iter().enumerate() {
+                        let text = format!("{}\n{} Karten", d.name, d.total());
+                        if ui
+                            .selectable_label(self.selected_deck == Some(i), text)
+                            .clicked()
+                        {
+                            self.selected_deck = Some(i);
+                        }
+                    }
+                });
+            });
+
+        let Some(di) = self.selected_deck.filter(|&i| i < self.decks.len()) else {
+            ui.label("Lege links ein Deck an oder importiere eins.");
+            ui.add_space(8.0);
+            ui.label("Ein Deck ist eine Kartenliste. Wenn eine Combo mit einem Deck verknüpft ist, stehen dessen Karten beim Eintragen ganz oben und sind mit einem Klick auswählbar.");
+            return;
+        };
+
+        let width = self.settings.card_width;
+        let german = self.settings.german_names;
+        let mut changed = false;
+        let mut remove_one = None;
+        let mut add_one = None;
+        let mut fill_archetype = None;
+        let mut open_picker = false;
+
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            let deck = &mut self.decks[di];
+            ui.horizontal(|ui| {
+                ui.label("Name");
+                changed |= ui
+                    .add(TextEdit::singleline(&mut deck.name).desired_width(300.0))
+                    .changed();
+                ui.label(format!("{} Karten", deck.total()));
+            });
+            ui.horizontal(|ui| {
+                if ui.button("+ Karte hinzufügen").clicked() {
+                    open_picker = true;
+                }
+                if ui
+                    .button("Als ydke kopieren")
+                    .on_hover_text("Kopiert die Liste als ydke-Link in die Zwischenablage.")
+                    .clicked()
+                {
+                    ui.ctx().copy_text(decks::to_ydke(deck));
+                    self.message = Some("ydke-Link wurde in die Zwischenablage kopiert.".into());
+                }
+                if ui.button("Deck löschen …").clicked() {
+                    self.confirm_delete_deck = Some(di);
+                }
+            });
+
+            ui.add_space(6.0);
+            ui.label(RichText::new("Alle Karten eines Archetyps hinzufügen").strong());
+            ui.add(
+                TextEdit::singleline(&mut self.archetype_query)
+                    .hint_text("Archetyp suchen, z. B. Lunalight")
+                    .desired_width(300.0),
+            );
+            let q = self.archetype_query.trim().to_lowercase();
+            if !q.is_empty() {
+                ui.horizontal_wrapped(|ui| {
+                    for a in self
+                        .db
+                        .archetypes()
+                        .into_iter()
+                        .filter(|a| a.to_lowercase().contains(&q))
+                        .take(12)
+                    {
+                        let n = self.db.cards_of_archetype(&a, self.settings.md_only).len();
+                        if ui.button(format!("{a} ({n})")).clicked() {
+                            fill_archetype = Some(a);
+                        }
+                    }
+                });
+            }
+
+            ui.separator();
+            ui.label(
+                RichText::new(
+                    "Klick auf eine Karte = eine Kopie entfernen. Rechtsklick = eine Kopie mehr.",
+                )
+                .weak(),
+            );
+            let deck = &self.decks[di];
+            ui.horizontal_wrapped(|ui| {
+                for c in &deck.cards {
+                    ui.vertical(|ui| {
+                        ui.set_width(width + 6.0);
+                        let slot = c.to_slot();
+                        let r = card_widget(
+                            ui,
+                            &mut self.images,
+                            &self.db,
+                            german,
+                            &slot,
+                            Action::None,
+                            width,
+                            None,
+                        );
+                        if r.clicked() {
+                            remove_one = Some(c.id);
+                        }
+                        if r.secondary_clicked() {
+                            add_one = Some(c.clone());
+                        }
+                        ui.label(RichText::new(format!("{}×", c.count)).strong());
+                    });
+                }
+            });
+        });
+
+        let deck = &mut self.decks[di];
+        if let Some(id) = remove_one {
+            deck.remove_one(id);
+            changed = true;
+        }
+        if let Some(c) = add_one {
+            deck.add(c.id, c.image_id, &c.name, 1);
+            changed = true;
+        }
+        if let Some(a) = fill_archetype {
+            for c in self.db.cards_of_archetype(&a, self.settings.md_only) {
+                if !deck.cards.iter().any(|x| x.id == c.id) {
+                    deck.add(c.id, c.image_id, &c.name, 1);
+                }
+            }
+            if deck.name == "Neues Deck" {
+                deck.name = a.clone();
+            }
+            self.archetype_query.clear();
+            changed = true;
+        }
+        if changed {
+            self.mark_dirty();
+        }
+        if open_picker {
+            self.open_picker(Target::Deck);
+        }
+    }
+
+    fn deck_import_window(&mut self, ctx: &egui::Context) {
+        let Some((name, text)) = &mut self.deck_import else {
+            return;
+        };
+        let mut open = true;
+        let mut do_import = false;
+        egui::Window::new("Deck importieren")
+            .open(&mut open)
+            .collapsible(false)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Name");
+                    ui.add(TextEdit::singleline(name).hint_text("z. B. Lunalight").desired_width(250.0));
+                });
+                ui.label("Füge hier die Deckliste ein (Strg+V). Erlaubt sind:");
+                ui.label("• ydke-Link (ydke://…), z. B. aus dem YGOPRODeck-Deckbuilder");
+                ui.label("• Inhalt einer .ydk-Datei");
+                ui.label("• Kartenliste, eine Karte pro Zeile: „3 Lunalight Gold Leo“ oder „Lunalight Gold Leo x3“");
+                egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
+                    ui.add(TextEdit::multiline(text).desired_rows(10).desired_width(420.0).code_editor());
+                });
+                if ui.button("Importieren").clicked() {
+                    do_import = true;
+                }
+            });
+        if do_import {
+            if self.db.is_empty() {
+                self.message =
+                    Some("Die Kartendatenbank ist noch nicht geladen. Bitte warten.".into());
+                return;
+            }
+            let name = if name.trim().is_empty() {
+                "Importiertes Deck".to_string()
+            } else {
+                name.trim().to_string()
+            };
+            let result = decks::import(text, &name, &self.db);
+            let total = result.deck.total();
+            self.decks.push(result.deck);
+            self.selected_deck = Some(self.decks.len() - 1);
+            self.deck_import = None;
+            self.mark_dirty();
+            let mut msg = format!("{total} Karten importiert.");
+            if !result.unknown.is_empty() {
+                msg.push_str(&format!(
+                    "\n\nNicht gefunden ({}):\n{}",
+                    result.unknown.len(),
+                    result.unknown.join("\n")
+                ));
+            }
+            self.message = Some(msg);
+            return;
+        }
+        if !open {
+            self.deck_import = None;
+        }
+    }
+
+    fn delete_deck_window(&mut self, ctx: &egui::Context) {
+        let Some(i) = self.confirm_delete_deck else {
+            return;
+        };
+        let Some(deck) = self.decks.get(i) else {
+            self.confirm_delete_deck = None;
+            return;
+        };
+        let name = deck.name.clone();
+        let mut answer = None;
+        egui::Window::new("Deck löschen?")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.label(format!(
+                    "„{name}“ wird endgültig gelöscht. Combos bleiben erhalten."
+                ));
+                ui.horizontal(|ui| {
+                    if ui.button("Löschen").clicked() {
+                        answer = Some(true);
+                    }
+                    if ui.button("Abbrechen").clicked() {
+                        answer = Some(false);
+                    }
+                });
+            });
+        match answer {
+            Some(true) => {
+                let id = self.decks.remove(i).id;
+                for c in &mut self.combos {
+                    if c.deck_id == Some(id) {
+                        c.deck_id = None;
+                    }
+                }
+                self.selected_deck = if self.decks.is_empty() {
+                    None
+                } else {
+                    Some(i.min(self.decks.len() - 1))
+                };
+                self.confirm_delete_deck = None;
+                self.mark_dirty();
+            }
+            Some(false) => self.confirm_delete_deck = None,
+            None => {}
+        }
+    }
 }

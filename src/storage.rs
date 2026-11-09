@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::model::Combo;
+use crate::model::{Combo, Deck};
 
 #[derive(Clone)]
 pub struct Paths {
@@ -31,6 +31,9 @@ impl Paths {
 
     pub fn combos_file(&self) -> PathBuf {
         self.data_dir.join("combos.json")
+    }
+    pub fn decks_file(&self) -> PathBuf {
+        self.data_dir.join("decks.json")
     }
     pub fn settings_file(&self) -> PathBuf {
         self.data_dir.join("settings.json")
@@ -97,6 +100,14 @@ pub fn load_combos(paths: &Paths) -> Result<Vec<Combo>> {
 
 pub fn save_combos(paths: &Paths, combos: &[Combo]) -> Result<()> {
     write_atomic(&paths.combos_file(), &serde_json::to_vec_pretty(combos)?)
+}
+
+pub fn load_decks(paths: &Paths) -> Result<Vec<Deck>> {
+    load_json(&paths.decks_file())
+}
+
+pub fn save_decks(paths: &Paths, decks: &[Deck]) -> Result<()> {
+    write_atomic(&paths.decks_file(), &serde_json::to_vec_pretty(decks)?)
 }
 
 pub fn load_settings(paths: &Paths) -> Settings {

@@ -6,6 +6,7 @@
 
 mod app;
 mod cards;
+mod decks;
 mod images;
 mod model;
 mod practice;

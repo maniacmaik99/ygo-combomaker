@@ -72,15 +72,19 @@ pub enum Action {
     SendToGy,
     Banish,
     Chain(u8),
+    Search,
+    Discard,
 }
 
 impl Action {
     /// Auswahl im Editor. Ketten-Glieder 1 bis 6 reichen für die Praxis.
-    pub const CHOICES: [Action; 13] = [
+    pub const CHOICES: [Action; 15] = [
         Action::None,
         Action::Activate,
         Action::NormalSummon,
         Action::SpecialSummon,
+        Action::Search,
+        Action::Discard,
         Action::Set,
         Action::SendToGy,
         Action::Banish,
@@ -103,6 +107,8 @@ impl Action {
             Action::SendToGy => "GY".into(),
             Action::Banish => "Ban".into(),
             Action::Chain(n) => format!("K{n}"),
+            Action::Search => "🔍".into(),
+            Action::Discard => "Ab".into(),
         })
     }
 
@@ -116,6 +122,8 @@ impl Action {
             Action::SendToGy => "Auf den Friedhof legen".into(),
             Action::Banish => "Verbannen".into(),
             Action::Chain(n) => format!("Kettenglied {n}"),
+            Action::Search => "Suchen (auf die Hand nehmen)".into(),
+            Action::Discard => "Abwerfen".into(),
         }
     }
 }
@@ -197,6 +205,9 @@ pub struct Combo {
     pub title: String,
     #[serde(default)]
     pub deck: String,
+    /// Verknüpfte Deckliste. Ihre Karten stehen in der Kartensuche oben.
+    #[serde(default)]
+    pub deck_id: Option<Uuid>,
     #[serde(default)]
     pub author: String,
     #[serde(default)]
@@ -221,6 +232,7 @@ impl Combo {
             id: Uuid::new_v4(),
             title: title.into(),
             deck: String::new(),
+            deck_id: None,
             author: String::new(),
             notes: String::new(),
             starting_hand: Vec::new(),
@@ -252,6 +264,73 @@ impl Combo {
             }
         }
         out
+    }
+}
+
+/// Eine Karte in einer Deckliste.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DeckCard {
+    pub id: u32,
+    pub image_id: u32,
+    pub name: String,
+    pub count: u8,
+}
+
+impl DeckCard {
+    pub fn to_slot(&self) -> Slot {
+        Slot::Card {
+            id: self.id,
+            image_id: self.image_id,
+            name: self.name.clone(),
+        }
+    }
+}
+
+/// Deckliste. Wird beim Eintragen von Combos benutzt, damit die passenden
+/// Karten mit einem Klick auswählbar sind.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct Deck {
+    pub id: Uuid,
+    pub name: String,
+    #[serde(default)]
+    pub cards: Vec<DeckCard>,
+}
+
+impl Deck {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            name: name.into(),
+            cards: Vec::new(),
+        }
+    }
+
+    /// Fügt eine Karte hinzu oder erhöht ihre Anzahl (höchstens 3).
+    pub fn add(&mut self, id: u32, image_id: u32, name: &str, count: u8) {
+        if let Some(c) = self.cards.iter_mut().find(|c| c.id == id) {
+            c.count = (c.count + count).min(3);
+        } else {
+            self.cards.push(DeckCard {
+                id,
+                image_id,
+                name: name.to_string(),
+                count: count.clamp(1, 3),
+            });
+        }
+    }
+
+    /// Verringert die Anzahl um 1 und entfernt die Karte bei 0.
+    pub fn remove_one(&mut self, id: u32) {
+        if let Some(i) = self.cards.iter().position(|c| c.id == id) {
+            self.cards[i].count -= 1;
+            if self.cards[i].count == 0 {
+                self.cards.remove(i);
+            }
+        }
+    }
+
+    pub fn total(&self) -> u32 {
+        self.cards.iter().map(|c| c.count as u32).sum()
     }
 }
 
@@ -341,6 +420,18 @@ mod tests {
         let json = serde_json::to_string(&c).unwrap();
         let back: Combo = serde_json::from_str(&json).unwrap();
         assert_eq!(c, back);
+    }
+
+    #[test]
+    fn deck_add_and_remove() {
+        let mut d = Deck::new("Lunalight");
+        d.add(1, 1, "A", 2);
+        d.add(1, 1, "A", 2);
+        assert_eq!(d.cards[0].count, 3);
+        d.add(2, 2, "B", 1);
+        assert_eq!(d.total(), 4);
+        d.remove_one(2);
+        assert_eq!(d.cards.len(), 1);
     }
 
     #[test]
