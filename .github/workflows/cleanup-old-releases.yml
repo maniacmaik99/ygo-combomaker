@@ -1,0 +1,26 @@
+# Einmaliger Job: löscht die alten Releases 0.1.0 bis 0.3.0 samt Tags.
+# Diese Datei wird danach wieder entfernt.
+name: Alte Releases entfernen
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/cleanup-old-releases.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Releases und Tags löschen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for v in v0.1.0 v0.2.0 v0.3.0; do
+            gh release delete "$v" --cleanup-tag --yes -R "$GITHUB_REPOSITORY" || true
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$v" || true
+          done
