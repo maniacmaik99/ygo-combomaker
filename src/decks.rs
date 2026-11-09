@@ -57,9 +57,10 @@ fn parse_ydke(rest: &str) -> Vec<u32> {
                 .ok()
         })
         .flat_map(|bytes| {
-            bytes
-                .chunks_exact(4)
-                .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            let (chunks, _rest) = bytes.as_chunks::<4>();
+            chunks
+                .iter()
+                .map(|c| u32::from_le_bytes(*c))
                 .collect::<Vec<_>>()
         })
         .collect()
