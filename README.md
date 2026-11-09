@@ -36,13 +36,12 @@ Solange das Repo **privat** ist, braucht die App dafür ein GitHub-Token (4 Schr
 
 Das Token wird unverschlüsselt in `settings.json` gespeichert. Es hat nur Leserecht für dieses eine Repo.
 
-## Neue Version veröffentlichen (3 Schritte)
+## Neue Version veröffentlichen (2 Schritte)
 
 1. In `Cargo.toml` die Version erhöhen, z. B. `0.2.0`.
-2. Committen und pushen.
-3. Tag pushen: `git tag v0.2.0 && git push origin v0.2.0`
+2. Committen und auf `main` pushen.
 
-GitHub Actions baut dann Linux- und Windows-Version und legt das Release an (Datei `.github/workflows/release.yml`).
+GitHub Actions merkt, dass es für diese Version noch kein Release gibt, baut Linux- und Windows-Version und legt das Release `v0.2.0` an (Datei `.github/workflows/release.yml`). Das dauert etwa 10 Minuten.
 
 ## Selbst bauen
 
