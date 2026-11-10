@@ -51,13 +51,15 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | Combos, Einstellungen | `~/.local/share/ygo-combomaker/` | `%APPDATA%\ygo-combomaker\data\` |
 | Kartendatenbank, Bilder | `~/.cache/ygo-combomaker/` | `%LOCALAPPDATA%\ygo-combomaker\cache\` |
 
-## Funktionen (Stand 0.5)
+## Funktionen (Stand 0.6)
 
 - **Sprachen:** Englisch, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch (Einstellungen → Sprache). Kartennamen optional in der gewählten Sprache (außer Spanisch, das bietet die Kartendatenbank nicht an).
 - **Bedienung wie im Spiel:** Karte anklicken → direkt an der Karte erscheint ein Menü mit den Aktionen, die an diesem Ort üblich sind (z. B. Hand: Normalbeschwörung, Spezialbeschwörung, Setzen, Effekt aktivieren). Oder die Karte mit der Maus auf eine Zone, den Friedhof, den Verbannt-Stapel oder die Hand ziehen. Deck und Extra Deck sind Stapel auf dem Feld. Esc oder Rechtsklick bricht ab, Strg+Z macht den letzten aufgenommenen Zug rückgängig. Optional wählt die App freie Zonen automatisch (Einstellungen).
 - **Tipp beim Üben:** markiert die Karte des nächsten Zugs.
 - **Handtest:** zieht eine zufällige Starthand aus einer Deckliste, zeigt, welche gespeicherten Combos damit spielbar sind, und simuliert 1000 Hände (Anteil der Hände, mit denen eine Combo spielbar ist).
 - **Suche in der Combo-Liste.**
+- **Freies Spiel im Handtest:** Die gezogene Hand lässt sich auf einem Spielfeld frei ausspielen (ohne Prüfung, mit Rückgängig).
+- **Kartengrößen:** getrennte Regler für die Kartengröße in Listen (bis 280) und im Fenster „Karte suchen“ (bis 220).
 - **Combo eintragen auf dem Spielfeld:** Starthand festlegen, dann die Combo spielen: Karte anklicken → Aktion wählen → falls nötig Zielzone anklicken. Jeder Zug wird gespeichert. „Neuer Schritt“ trennt Schritte, „Letzten Zug rückgängig“, „Feld als Endboard übernehmen“.
 - **Combo eintragen als Liste:** alle Bereiche (Starthand, Endboard, Handtraps, benötigte Karten, Schritte) Karte für Karte bearbeiten.
 - **Spielfeld (Aufbau wie Master Rule 5):** 2 Extra-Monsterzonen über Monsterzone 2 und 4; Feldzauberzone, 5 Monsterzonen, Friedhof; Extra Deck, 5 Zauber-/Fallenzonen (die beiden äußeren sind zugleich die Pendelzonen), Deck; Verbannt über dem Friedhof; Hand darunter. Das Feld passt seine Größe an das Fenster an und ist zentriert. Xyz-Material erscheint als Stapel, sobald es welches gibt.

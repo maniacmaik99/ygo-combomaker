@@ -608,6 +608,18 @@ pub const T: &[(&str, &str)] = &[
     ("rec.undo_hint", "Scorciatoia: Ctrl+Z"),
     ("area.pendulum_zone", "Zona Pendulum"),
     ("cell.spell_trap_pendulum", "M/T · P"),
+    (
+        "settings.picker_card_size",
+        "Dimensione delle carte nella ricerca",
+    ),
+    ("handtest.play", "Gioca questa mano sul terreno"),
+    (
+        "handtest.play_hint",
+        "Apre un terreno libero con questa mano. Le mosse non vengono controllate.",
+    ),
+    ("handtest.play_title", "Gioco libero"),
+    ("handtest.play_reset", "Ricomincia con questa mano"),
+    ("handtest.play_close", "Chiudi il terreno"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

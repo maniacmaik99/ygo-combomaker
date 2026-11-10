@@ -56,6 +56,8 @@ enum Target {
     RecordFrom(crate::board::Area),
     /// Karte für das Spielfeld aus Deck oder Extra Deck (Üben).
     PracticeFrom(crate::board::Area),
+    /// Karte für das freie Spielfeld im Handtest.
+    FreeFrom(crate::board::Area),
 }
 
 /// Welche Karte im Listen-Editor ausgewählt ist.
@@ -601,8 +603,12 @@ impl ComboApp {
         ui.separator();
         ui.checkbox(&mut self.settings.md_only, tr("settings.md_only"));
         ui.add(
-            egui::Slider::new(&mut self.settings.card_width, 48.0..=140.0)
+            egui::Slider::new(&mut self.settings.card_width, 48.0..=280.0)
                 .text(tr("settings.card_size")),
+        );
+        ui.add(
+            egui::Slider::new(&mut self.settings.picker_card_width, 40.0..=220.0)
+                .text(tr("settings.picker_card_size")),
         );
         ui.checkbox(&mut self.settings.auto_zone, tr("settings.auto_zone"))
             .on_hover_text(tr("settings.auto_zone_hint"));

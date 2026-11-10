@@ -584,6 +584,18 @@ pub const T: &[(&str, &str)] = &[
     ("rec.undo_hint", "Tastenkürzel: Strg+Z"),
     ("area.pendulum_zone", "Pendelzone"),
     ("cell.spell_trap_pendulum", "Z/F · P"),
+    (
+        "settings.picker_card_size",
+        "Kartengröße in der Kartensuche",
+    ),
+    ("handtest.play", "Diese Hand auf dem Spielfeld ausspielen"),
+    (
+        "handtest.play_hint",
+        "Öffnet ein freies Spielfeld mit dieser Hand. Züge werden nicht geprüft.",
+    ),
+    ("handtest.play_title", "Freies Spiel"),
+    ("handtest.play_reset", "Mit dieser Hand neu beginnen"),
+    ("handtest.play_close", "Spielfeld schließen"),
     ("settings.auto_zone", "Spielfeld: Zone automatisch wählen"),
     (
         "settings.auto_zone_hint",

@@ -5,8 +5,10 @@
 use egui::RichText;
 use uuid::Uuid;
 
-use super::widgets::{Marks, View as CardView, card_widget, is_extra};
-use super::{ComboApp, View};
+use super::field::{FieldEvent, FieldUi};
+use super::widgets::{Marks, View as CardView, card_widget, is_extra, kind_of};
+use super::{ComboApp, Target, View};
+use crate::board::{Area, Board};
 use crate::i18n::{tr, trf};
 use crate::model::{Combo, Deck, Entry, Slot};
 
@@ -189,6 +191,41 @@ pub struct HandTestState {
     hand_deck: Option<Uuid>,
     sim: Option<SimResult>,
     rng: Rng,
+    /// Freies Spielfeld, auf dem die gezogene Hand ausgespielt wird.
+    play: Option<FreePlay>,
+}
+
+/// Freies Spiel: Züge werden ausgeführt, aber nicht geprüft.
+struct FreePlay {
+    board: Board,
+    field: FieldUi,
+    /// Frühere Zustände für „Rückgängig“.
+    history: Vec<Board>,
+}
+
+impl FreePlay {
+    fn new(hand: &[Slot]) -> Self {
+        let entries: Vec<Entry> = hand.iter().cloned().map(Entry::new).collect();
+        Self {
+            board: Board::with_hand(&entries),
+            field: FieldUi::default(),
+            history: Vec::new(),
+        }
+    }
+}
+
+impl HandTestState {
+    /// Deck, aus dem die Kartenauswahl des freien Spielfelds Karten anbietet.
+    pub(super) fn deck_id(&self) -> Option<Uuid> {
+        self.deck_id
+    }
+
+    /// Karte aus der Kartenauswahl (Deck/Extra Deck) für das freie Spielfeld.
+    pub(super) fn select_from_picker(&mut self, slot: Slot, area: Area) {
+        if let Some(p) = &mut self.play {
+            p.field.select(slot, area);
+        }
+    }
 }
 
 impl Default for HandTestState {
@@ -200,6 +237,7 @@ impl Default for HandTestState {
             hand_deck: None,
             sim: None,
             rng: Rng::from_entropy(),
+            play: None,
         }
     }
 }
@@ -215,6 +253,65 @@ enum Jump {
 }
 
 impl ComboApp {
+    /// Freies Spielfeld für die gezogene Hand.
+    fn free_play_ui(&mut self, ui: &mut egui::Ui) {
+        let v = CardView {
+            db: &self.db,
+            name_lang: self.name_lang(),
+        };
+        let auto_zone = self.settings.auto_zone;
+        let Some(play) = self.hand_test.play.as_mut() else {
+            return;
+        };
+        let mut undo = !ui.ctx().egui_wants_keyboard_input()
+            && ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Z));
+        let mut reset = false;
+        let mut close = false;
+        ui.horizontal_wrapped(|ui| {
+            ui.label(RichText::new(tr("handtest.play_title")).strong());
+            undo |= ui
+                .add_enabled(!play.history.is_empty(), egui::Button::new(tr("rec.undo")))
+                .on_hover_text(tr("rec.undo_hint"))
+                .clicked();
+            reset = ui.button(tr("handtest.play_reset")).clicked();
+            close = ui.button(tr("handtest.play_close")).clicked();
+        });
+        let mut pick = None;
+        let mut error = None;
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            match play
+                .field
+                .show(ui, &play.board, &mut self.images, v, 56.0, auto_zone)
+            {
+                Some(FieldEvent::Pick(area)) => pick = Some(area),
+                Some(FieldEvent::Move(mv)) => {
+                    let before = play.board.clone();
+                    match play.board.apply(&mv, kind_of(v.db, &mv.slot)) {
+                        Ok(()) => play.history.push(before),
+                        Err(e) => error = Some(tr(e.key()).to_string()),
+                    }
+                }
+                None => {}
+            }
+        });
+        if undo && let Some(b) = play.history.pop() {
+            play.board = b;
+            play.field.reset();
+        }
+        if reset {
+            *play = FreePlay::new(&self.hand_test.hand);
+        }
+        if close {
+            self.hand_test.play = None;
+        }
+        if let Some(e) = error {
+            self.message = Some(e);
+        }
+        if let Some(area) = pick {
+            self.open_picker(Target::FreeFrom(area));
+        }
+    }
+
     /// Karten des Main Decks, jede Kopie einzeln. Extra-Deck-Monster fehlen.
     fn main_deck_pool(&self, deck: &Deck) -> Vec<Slot> {
         let mut pool = Vec::new();
@@ -269,6 +366,7 @@ impl ComboApp {
             // nicht mehr. Im nächsten Bild wird das neue Deck gezeigt.
             self.hand_test.deck_id = Some(self.decks[new_di].id);
             self.hand_test.hand.clear();
+            self.hand_test.play = None;
             self.hand_test.hand_deck = None;
             self.hand_test.sim = None;
             ui.ctx().request_repaint();
@@ -278,6 +376,7 @@ impl ComboApp {
         self.hand_test.deck_id = Some(deck_id);
         if self.hand_test.hand_deck.is_some_and(|id| id != deck_id) {
             self.hand_test.hand.clear();
+            self.hand_test.play = None;
             self.hand_test.hand_deck = None;
         }
 
@@ -303,6 +402,7 @@ impl ComboApp {
                 .map(|i| pool[i].clone())
                 .collect();
             self.hand_test.hand_deck = Some(deck_id);
+            self.hand_test.play = None;
         }
         if run_sim {
             let ids: Vec<u32> = pool.iter().filter_map(Slot::card_id).collect();
@@ -329,12 +429,19 @@ impl ComboApp {
             });
         }
 
+        if self.hand_test.play.is_some() {
+            ui.separator();
+            self.free_play_ui(ui);
+            return;
+        }
+
         let width = self.settings.card_width;
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
         };
         let mut jump = None;
+        let mut start_play = false;
         let comma = crate::i18n::lang() != crate::i18n::Lang::En;
 
         ui.separator();
@@ -349,6 +456,13 @@ impl ComboApp {
                         card_widget(ui, &mut self.images, v, slot, Marks::default(), width, None);
                     }
                 });
+                if ui
+                    .button(RichText::new(tr("handtest.play")).strong())
+                    .on_hover_text(tr("handtest.play_hint"))
+                    .clicked()
+                {
+                    start_play = true;
+                }
                 ui.add_space(8.0);
 
                 // --- Spielbare Combos ---
@@ -417,6 +531,9 @@ impl ComboApp {
             }
         });
 
+        if start_play {
+            self.hand_test.play = Some(FreePlay::new(&self.hand_test.hand));
+        }
         match jump {
             Some(Jump::Practice(i)) => {
                 self.select_combo(Some(i));

@@ -57,7 +57,7 @@ impl ComboApp {
             self.mark_dirty();
         }
 
-        let width = (self.settings.card_width * 0.85).clamp(48.0, 90.0);
+        let width = (self.settings.card_width * 0.85).max(48.0);
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),

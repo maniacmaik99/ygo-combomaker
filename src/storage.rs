@@ -58,6 +58,8 @@ pub struct Settings {
     /// Kartenbreite in Pixeln im Editor.
     pub card_width: f32,
     /// Beim Start automatisch nach Updates suchen.
+    /// Kartenbreite im Fenster „Karte suchen“.
+    pub picker_card_width: f32,
     pub auto_update_check: bool,
     /// Spielfeld: freie Zone automatisch wählen statt anklicken.
     pub auto_zone: bool,
@@ -73,6 +75,7 @@ impl Default for Settings {
             localized_card_names: false,
             md_only: true,
             card_width: 72.0,
+            picker_card_width: 64.0,
             auto_update_check: true,
             auto_zone: false,
             github_token: String::new(),

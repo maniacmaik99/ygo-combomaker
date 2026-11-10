@@ -40,6 +40,10 @@ impl ComboApp {
                 }
                 self.picker = None;
             }
+            Target::FreeFrom(area) => {
+                self.hand_test.select_from_picker(slot, area);
+                self.picker = None;
+            }
             Target::Section(sec) => {
                 if let Some(idx) = self.selected {
                     sec.entries_mut(&mut self.combos[idx])
@@ -70,26 +74,33 @@ impl ComboApp {
         let mut open = true;
         let mut chosen: Option<Slot> = None;
         let md_only = &mut self.settings.md_only;
+        let pw = self.settings.picker_card_width.clamp(40.0, 220.0);
         let images = &mut self.images;
         let db = v.db;
         let title = match picker.target {
             Target::Deck => tr("picker.title_deck"),
-            Target::RecordFrom(Area::ExtraDeck) | Target::PracticeFrom(Area::ExtraDeck) => {
-                tr("picker.title_extra")
+            Target::RecordFrom(Area::ExtraDeck)
+            | Target::PracticeFrom(Area::ExtraDeck)
+            | Target::FreeFrom(Area::ExtraDeck) => tr("picker.title_extra"),
+            Target::RecordFrom(_) | Target::PracticeFrom(_) | Target::FreeFrom(_) => {
+                tr("picker.title_deck_field")
             }
-            Target::RecordFrom(_) | Target::PracticeFrom(_) => tr("picker.title_deck_field"),
             _ => tr("picker.title_add"),
         };
         // Nur Extra-Deck-Karten (true), nur Main-Deck-Karten (false) oder alle (None).
         let extra_filter = match picker.target {
-            Target::RecordFrom(Area::ExtraDeck) | Target::PracticeFrom(Area::ExtraDeck) => {
-                Some(true)
-            }
-            Target::RecordFrom(_) | Target::PracticeFrom(_) => Some(false),
+            Target::RecordFrom(Area::ExtraDeck)
+            | Target::PracticeFrom(Area::ExtraDeck)
+            | Target::FreeFrom(Area::ExtraDeck) => Some(true),
+            Target::RecordFrom(_) | Target::PracticeFrom(_) | Target::FreeFrom(_) => Some(false),
             _ => None,
         };
         let deck = match picker.target {
             Target::Deck => None,
+            Target::FreeFrom(_) => self
+                .hand_test
+                .deck_id()
+                .and_then(|id| self.decks.iter().find(|d| d.id == id)),
             _ => self
                 .selected
                 .and_then(|i| self.combos[i].deck_id)
@@ -97,7 +108,7 @@ impl ComboApp {
         };
         egui::Window::new(title)
             .open(&mut open)
-            .default_size([460.0, 560.0])
+            .default_size([(pw * 6.5).max(460.0), 560.0])
             .pivot(Align2::CENTER_TOP)
             .default_pos(ctx.content_rect().center_top() + Vec2::new(0.0, 60.0))
             .collapsible(false)
@@ -135,21 +146,13 @@ impl ComboApp {
                     ui.label(RichText::new(trf("picker.from_deck", &[&deck.name])).strong());
                     egui::ScrollArea::vertical()
                         .id_salt("deck_cards")
-                        .max_height(260.0)
+                        .max_height((pw * 4.6).max(260.0))
                         .show(ui, |ui| {
                             ui.horizontal_wrapped(|ui| {
                                 for c in cards {
                                     let slot = c.to_slot();
-                                    if card_widget(
-                                        ui,
-                                        images,
-                                        v,
-                                        &slot,
-                                        Marks::default(),
-                                        56.0,
-                                        None,
-                                    )
-                                    .clicked()
+                                    if card_widget(ui, images, v, &slot, Marks::default(), pw, None)
+                                        .clicked()
                                     {
                                         chosen = Some(slot);
                                     }
@@ -184,8 +187,15 @@ impl ComboApp {
                         for card in &results {
                             ui.horizontal(|ui| {
                                 let slot = card.to_slot();
-                                let thumb =
-                                    card_widget(ui, images, v, &slot, Marks::default(), 40.0, None);
+                                let thumb = card_widget(
+                                    ui,
+                                    images,
+                                    v,
+                                    &slot,
+                                    Marks::default(),
+                                    pw * 0.7,
+                                    None,
+                                );
                                 let shown = card.localized_name(v.name_lang);
                                 let name = if shown != card.name {
                                     format!("{shown}\n{}", card.name)

@@ -272,7 +272,7 @@ impl ComboApp {
         ui.add_space(4.0);
 
         // Spielfeld
-        let width = (self.settings.card_width * 0.85).clamp(48.0, 90.0);
+        let width = 56.0;
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
@@ -357,7 +357,7 @@ impl ComboApp {
         if combo.steps.iter().all(|s| s.parts.is_empty()) {
             ui.label(RichText::new(tr("editor.no_steps")).weak());
         }
-        let width = (self.settings.card_width * 0.7).max(44.0);
+        let width = (self.settings.card_width * 0.85).max(44.0);
         for (si, step) in combo.steps.iter().enumerate() {
             ui.horizontal(|ui| {
                 ui.add_sized(

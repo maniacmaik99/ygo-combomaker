@@ -611,6 +611,15 @@ pub const T: &[(&str, &str)] = &[
     ("rec.undo_hint", "Atalho: Ctrl+Z"),
     ("area.pendulum_zone", "Zona de Pêndulo"),
     ("cell.spell_trap_pendulum", "M/A · P"),
+    ("settings.picker_card_size", "Tamanho dos cards na busca"),
+    ("handtest.play", "Jogar esta mão no campo"),
+    (
+        "handtest.play_hint",
+        "Abre um campo livre com esta mão. As jogadas não são verificadas.",
+    ),
+    ("handtest.play_title", "Jogo livre"),
+    ("handtest.play_reset", "Recomeçar com esta mão"),
+    ("handtest.play_close", "Fechar o campo"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",
