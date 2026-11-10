@@ -167,7 +167,8 @@ pub fn card_widget_sense(
         };
         match slot {
             Slot::Card { image_id, .. } => {
-                if let Some(tex) = images.get(*image_id) {
+                let px = width * ui.ctx().pixels_per_point();
+                if let Some(tex) = images.get_for_width(*image_id, px) {
                     let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
                     painter.image(tex.id(), rect, uv, Color32::WHITE);
                 } else if images.failed(*image_id) {

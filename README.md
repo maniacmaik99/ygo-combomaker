@@ -9,6 +9,7 @@ Kartennamen, Kartentexte und Bilder kommen von der freien **YGOPRODeck-API** (ht
 
 - Beim ersten Start lädt die App die komplette Kartenliste (englisch + deutsche Namen) und speichert sie lokal.
 - Bilder werden erst geladen, wenn eine Karte angezeigt wird, und danach lokal gespeichert. Jedes Bild wird nur einmal heruntergeladen.
+- Normalerweise lädt die App das kleine Kartenbild. Wird eine Karte breiter als etwa 176 Pixel angezeigt, lädt sie zusätzlich einmal das große Bild (Ordner `images/large`), damit die Karte scharf bleibt.
 - Höchstens 20 Bild-Downloads pro Sekunde (Limit der API).
 - „Karten aktualisieren“ prüft online die Datenbank-Version und lädt nur bei Änderungen neu.
 
