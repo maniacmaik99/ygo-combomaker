@@ -1,6 +1,6 @@
 [package]
 name = "ygo-combomaker"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 description = "Desktop-App zum Eintragen und Üben von Yu-Gi-Oh!-Combos"
 license = "MIT"

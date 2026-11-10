@@ -20,8 +20,6 @@ pub enum Area {
     Monster(u8),
     Emz(u8),
     SpellTrap(u8),
-    PendulumLeft,
-    PendulumRight,
     Field,
 }
 
@@ -29,12 +27,7 @@ impl Area {
     pub fn is_field_zone(self) -> bool {
         matches!(
             self,
-            Area::Monster(_)
-                | Area::Emz(_)
-                | Area::SpellTrap(_)
-                | Area::PendulumLeft
-                | Area::PendulumRight
-                | Area::Field
+            Area::Monster(_) | Area::Emz(_) | Area::SpellTrap(_) | Area::Field
         )
     }
 
@@ -43,8 +36,6 @@ impl Area {
             Area::Monster(_) => Zone::MonsterZone,
             Area::Emz(_) => Zone::ExtraMonsterZone,
             Area::SpellTrap(_) => Zone::SpellTrapZone,
-            Area::PendulumLeft => Zone::PendulumLeft,
-            Area::PendulumRight => Zone::PendulumRight,
             Area::Field => Zone::FieldZone,
             _ => Zone::None,
         }
@@ -91,7 +82,8 @@ impl Dest {
             Dest::ChooseMonster => matches!(area, Area::Monster(_) | Area::Emz(_)),
             Dest::ChooseSpellTrap => matches!(area, Area::SpellTrap(_)),
             Dest::ChooseSpellTrapOrField => matches!(area, Area::SpellTrap(_) | Area::Field),
-            Dest::ChoosePendulum => matches!(area, Area::PendulumLeft | Area::PendulumRight),
+            // Die Pendelzonen sind die äußerste linke und rechte Zauber-/Fallenzone.
+            Dest::ChoosePendulum => matches!(area, Area::SpellTrap(0) | Area::SpellTrap(4)),
             Dest::ChooseHandOrGy => matches!(area, Area::Hand | Area::Gy),
             _ => false,
         }
@@ -270,8 +262,12 @@ pub fn context_actions(t: &CardTraits, from: Area, face_down: bool) -> Vec<Actio
             v
         }
         Area::SpellTrap(_) | Area::Field => {
-            vec![
-                Activate,
+            let mut v = vec![Activate];
+            if monster {
+                // Pendelmonster in der Pendelzone.
+                v.extend([SpecialSummon, ReturnToExtraDeck]);
+            }
+            v.extend([
                 SendToGy,
                 Destroy,
                 ReturnToHand,
@@ -279,18 +275,8 @@ pub fn context_actions(t: &CardTraits, from: Area, face_down: bool) -> Vec<Actio
                 ReturnToDeck,
                 Negate,
                 Target,
-            ]
-        }
-        Area::PendulumLeft | Area::PendulumRight => {
-            vec![
-                Activate,
-                SpecialSummon,
-                Destroy,
-                ReturnToExtraDeck,
-                SendToGy,
-                ReturnToHand,
-                Banish,
-            ]
+            ]);
+            v
         }
     };
     // „Kettenglied“ überall dort, wo man einen Effekt aktivieren kann.
@@ -331,8 +317,6 @@ pub struct Board {
     pub monsters: [Option<FieldCard>; 5],
     pub emz: [Option<FieldCard>; 2],
     pub spell_trap: [Option<FieldCard>; 5],
-    pub pendulum_left: Option<FieldCard>,
-    pub pendulum_right: Option<FieldCard>,
     pub field: Option<FieldCard>,
 }
 
@@ -374,8 +358,6 @@ impl Board {
             Area::Monster(i) => self.monsters.get_mut(i as usize),
             Area::Emz(i) => self.emz.get_mut(i as usize),
             Area::SpellTrap(i) => self.spell_trap.get_mut(i as usize),
-            Area::PendulumLeft => Some(&mut self.pendulum_left),
-            Area::PendulumRight => Some(&mut self.pendulum_right),
             Area::Field => Some(&mut self.field),
             _ => None,
         }
@@ -386,8 +368,6 @@ impl Board {
             Area::Monster(i) => self.monsters.get(i as usize)?.as_ref(),
             Area::Emz(i) => self.emz.get(i as usize)?.as_ref(),
             Area::SpellTrap(i) => self.spell_trap.get(i as usize)?.as_ref(),
-            Area::PendulumLeft => self.pendulum_left.as_ref(),
-            Area::PendulumRight => self.pendulum_right.as_ref(),
             Area::Field => self.field.as_ref(),
             _ => None,
         }
@@ -406,7 +386,7 @@ impl Board {
 
     /// Alle Zonen auf dem Feld in fester Reihenfolge.
     pub fn field_areas() -> Vec<Area> {
-        let mut v = vec![Area::Field, Area::PendulumLeft, Area::PendulumRight];
+        let mut v = vec![Area::Field];
         v.extend((0..2).map(Area::Emz));
         v.extend((0..5).map(Area::Monster));
         v.extend((0..5).map(Area::SpellTrap));
@@ -421,7 +401,9 @@ impl Board {
             .collect();
         // Bevorzugte Zone zuerst, Monsterzonen von der Mitte aus.
         candidates.sort_by_key(|a| {
-            let preferred = a.zone() == prefer;
+            let preferred = a.zone() == prefer
+                || (prefer == Zone::PendulumLeft && *a == Area::SpellTrap(0))
+                || (prefer == Zone::PendulumRight && *a == Area::SpellTrap(4));
             let center = match a {
                 Area::Monster(i) | Area::SpellTrap(i) => (*i as i32 - 2).abs(),
                 _ => 0,
@@ -574,6 +556,12 @@ pub fn move_to_part(mv: &Move, kind: CardKind) -> StepPart {
             Zone::Graveyard
         } else {
             Zone::Hand
+        }
+    } else if mv.action == Action::PlacePendulum {
+        if mv.to == Some(Area::SpellTrap(4)) {
+            Zone::PendulumRight
+        } else {
+            Zone::PendulumLeft
         }
     } else {
         dest_area.map(Area::zone).unwrap_or(Zone::None)
@@ -813,12 +801,12 @@ mod tests {
                 slot: card(7),
                 from: Area::Hand,
                 action: Action::PlacePendulum,
-                to: Some(Area::PendulumLeft),
+                to: Some(Area::SpellTrap(0)),
             },
             CardKind::Monster,
         )
         .unwrap();
-        assert_eq!(b.find(&card(7)), Some(Area::PendulumLeft));
+        assert_eq!(b.find(&card(7)), Some(Area::SpellTrap(0)));
     }
 
     #[test]

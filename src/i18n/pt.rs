@@ -609,6 +609,8 @@ pub const T: &[(&str, &str)] = &[
         "Clique em um card para removê-lo. O campo abaixo é reconstruído automaticamente.",
     ),
     ("rec.undo_hint", "Atalho: Ctrl+Z"),
+    ("area.pendulum_zone", "Zona de Pêndulo"),
+    ("cell.spell_trap_pendulum", "M/A · P"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

@@ -579,13 +579,12 @@ impl ComboApp {
         ui.set_min_width(280.0);
         ui.label(RichText::new(tr("settings.language")).strong());
         let mut lang = self.settings.lang.unwrap_or_default();
-        egui::ComboBox::from_id_salt("lang")
-            .selected_text(lang.native_name())
-            .show_ui(ui, |ui| {
-                for l in Lang::ALL {
-                    ui.selectable_value(&mut lang, l, l.native_name());
-                }
-            });
+        // Knöpfe statt Dropdown: Ein Dropdown im Menü würde das Menü schließen.
+        ui.horizontal_wrapped(|ui| {
+            for l in Lang::ALL {
+                ui.selectable_value(&mut lang, l, l.native_name());
+            }
+        });
         if Some(lang) != self.settings.lang {
             self.settings.lang = Some(lang);
             i18n::set_lang(lang);

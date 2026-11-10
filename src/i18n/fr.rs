@@ -627,6 +627,8 @@ pub const T: &[(&str, &str)] = &[
         "Clique sur une carte pour la retirer. Le terrain en dessous est reconstruit automatiquement.",
     ),
     ("rec.undo_hint", "Raccourci : Ctrl+Z"),
+    ("area.pendulum_zone", "Zone Pendule"),
+    ("cell.spell_trap_pendulum", "M/P · P"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

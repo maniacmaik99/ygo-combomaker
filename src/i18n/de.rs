@@ -582,6 +582,8 @@ pub const T: &[(&str, &str)] = &[
         "Klick auf eine Karte entfernt sie. Das Spielfeld darunter wird automatisch neu aufgebaut.",
     ),
     ("rec.undo_hint", "Tastenkürzel: Strg+Z"),
+    ("area.pendulum_zone", "Pendelzone"),
+    ("cell.spell_trap_pendulum", "Z/F · P"),
     ("settings.auto_zone", "Spielfeld: Zone automatisch wählen"),
     (
         "settings.auto_zone_hint",

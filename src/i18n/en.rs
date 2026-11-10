@@ -555,6 +555,8 @@ pub const T: &[(&str, &str)] = &[
         "Click a card to remove it. The board below is rebuilt automatically.",
     ),
     ("rec.undo_hint", "Shortcut: Ctrl+Z"),
+    ("area.pendulum_zone", "Pendulum Zone"),
+    ("cell.spell_trap_pendulum", "S/T · P"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

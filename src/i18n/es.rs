@@ -615,6 +615,8 @@ pub const T: &[(&str, &str)] = &[
         "Haz clic en una carta para quitarla. El campo de abajo se reconstruye automáticamente.",
     ),
     ("rec.undo_hint", "Atajo: Ctrl+Z"),
+    ("area.pendulum_zone", "Zona de Péndulo"),
+    ("cell.spell_trap_pendulum", "H/T · P"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

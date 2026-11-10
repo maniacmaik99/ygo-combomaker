@@ -606,6 +606,8 @@ pub const T: &[(&str, &str)] = &[
         "Clicca una carta per rimuoverla. Il terreno sotto viene ricostruito automaticamente.",
     ),
     ("rec.undo_hint", "Scorciatoia: Ctrl+Z"),
+    ("area.pendulum_zone", "Zona Pendulum"),
+    ("cell.spell_trap_pendulum", "M/T · P"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

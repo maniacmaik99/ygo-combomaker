@@ -82,9 +82,12 @@ pub fn area_label(a: Area) -> String {
         Area::Overlay => tr("area.overlay").into(),
         Area::Monster(i) => trf("area.monster_n", &[&(i + 1)]),
         Area::Emz(i) => trf("area.emz_n", &[&(i + 1)]),
+        Area::SpellTrap(i @ (0 | 4)) => format!(
+            "{} ({})",
+            trf("area.spell_trap_n", &[&(i + 1)]),
+            tr("area.pendulum_zone")
+        ),
         Area::SpellTrap(i) => trf("area.spell_trap_n", &[&(i + 1)]),
-        Area::PendulumLeft => tr("area.pendulum_left").into(),
-        Area::PendulumRight => tr("area.pendulum_right").into(),
         Area::Field => tr("area.field").into(),
     }
 }
@@ -93,8 +96,8 @@ fn short_label(a: Area) -> &'static str {
     match a {
         Area::Monster(_) => tr("cell.monster"),
         Area::Emz(_) => tr("cell.emz"),
+        Area::SpellTrap(0 | 4) => tr("cell.spell_trap_pendulum"),
         Area::SpellTrap(_) => tr("cell.spell_trap"),
-        Area::PendulumLeft | Area::PendulumRight => tr("cell.pendulum"),
         Area::Field => tr("cell.field"),
         Area::Gy => tr("cell.gy"),
         Area::Banished => tr("cell.banished"),
@@ -235,18 +238,34 @@ impl FieldUi {
                 Area::Deck
             })
         });
+        // Kartenbreite: so groß, dass 7 Spalten und 4 Reihen in den
+        // sichtbaren Bereich passen. `width` ist nur die Untergrenze.
+        let gap = ui.spacing().item_spacing;
+        let avail_w = ui.available_width();
+        let by_width = (avail_w - 6.0 * gap.x) / 7.0;
+        let screen_h = ctx.content_rect().height();
+        let by_height = (screen_h - 430.0 - 3.0 * gap.y) / (4.0 * CARD_RATIO);
+        let w = by_width.min(by_height).clamp(width.min(56.0), 170.0);
+        let board_w = 7.0 * w + 6.0 * gap.x;
+        let pad = ((avail_w - board_w) / 2.0).max(0.0);
         let mut cx = Cx {
             board,
             images,
             v,
-            w: width,
+            w,
             auto_zone,
             event: None,
             hint_area,
         };
 
-        self.status_line(ui);
-        self.board_ui(ui, &mut cx);
+        ui.horizontal_top(|ui| {
+            ui.add_space(pad);
+            ui.vertical(|ui| {
+                ui.set_width(board_w);
+                self.status_line(ui);
+                self.board_ui(ui, &mut cx);
+            });
+        });
         self.menu(&ctx, &mut cx);
         self.drag_and_drop(&ctx, &mut cx);
 
@@ -288,9 +307,15 @@ impl FieldUi {
         let gap = ui.spacing().item_spacing.x;
         let board = cx.board;
 
-        // Reihe 1: Xyz-Material, Extra-Monsterzonen, Verbannt.
+        // Aufbau wie auf dem echten Spielfeld (Master Rule 5):
+        // Reihe 1: 2 Extra-Monsterzonen über Monsterzone 2 und 4; rechts Verbannt.
+        // Xyz-Material ist keine echte Zone und erscheint nur, wenn es welches gibt.
         ui.horizontal(|ui| {
-            self.pile(ui, cx, Area::Overlay, &board.overlay);
+            if board.overlay.is_empty() {
+                ui.add_space(w + gap);
+            } else {
+                self.pile(ui, cx, Area::Overlay, &board.overlay);
+            }
             ui.add_space(w + gap);
             self.zone_cell(ui, cx, Area::Emz(0));
             ui.add_space(w + gap);
@@ -298,7 +323,7 @@ impl FieldUi {
             ui.add_space(w + gap);
             self.pile(ui, cx, Area::Banished, &board.banished);
         });
-        // Reihe 2: Feldzauber, 5 Monsterzonen, Friedhof.
+        // Reihe 2: Feldzauberzone, 5 Monsterzonen, Friedhof.
         ui.horizontal(|ui| {
             self.zone_cell(ui, cx, Area::Field);
             for i in 0..5 {
@@ -306,24 +331,30 @@ impl FieldUi {
             }
             self.pile(ui, cx, Area::Gy, &board.gy);
         });
-        // Reihe 3: Pendel links, 5 Zauber/Fallen, Pendel rechts.
+        // Reihe 3: Extra Deck, 5 Zauber-/Fallenzonen (die äußeren sind
+        // zugleich die Pendelzonen), Deck.
         ui.horizontal(|ui| {
-            self.zone_cell(ui, cx, Area::PendulumLeft);
+            self.deck_pile(ui, cx, Area::ExtraDeck);
             for i in 0..5 {
                 self.zone_cell(ui, cx, Area::SpellTrap(i));
             }
-            self.zone_cell(ui, cx, Area::PendulumRight);
+            self.deck_pile(ui, cx, Area::Deck);
         });
-        ui.add_space(4.0);
-        // Reihe 4: Extra Deck, Hand, Deck.
-        ui.horizontal_top(|ui| {
-            self.deck_pile(ui, cx, Area::ExtraDeck);
-            let hand_w = 5.0 * (w + gap) - gap;
+        ui.add_space(6.0);
+        // Reihe 4: Hand über die ganze Breite.
+        {
+            let hand_w = 7.0 * (w + gap) - gap;
             let inner = ui.allocate_ui_with_layout(
                 Vec2::new(hand_w, w * CARD_RATIO),
                 egui::Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
                 |ui| {
                     ui.set_min_size(Vec2::new(hand_w, w * CARD_RATIO));
+                    // Hand in der Mitte ausrichten.
+                    let n = board.hand.len().min(7) as f32;
+                    let used = n * (w + gap) - gap;
+                    if n > 0.0 && used < hand_w {
+                        ui.add_space((hand_w - used) / 2.0);
+                    }
                     for c in &board.hand {
                         self.card(ui, cx, c, Area::Hand, w, Marks::default());
                     }
@@ -354,8 +385,7 @@ impl FieldUi {
                     Color32::from_white_alpha(90),
                 );
             }
-            self.deck_pile(ui, cx, Area::Deck);
-        });
+        }
 
         // Aufgeklappter Stapel
         if let Some(area) = self.open_pile {
@@ -651,59 +681,63 @@ impl FieldUi {
             .constrain(true)
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.set_width(210.0);
-                    ui.label(RichText::new(shown_name(cx.v, &slot)).strong());
-                    let place = match to {
-                        Some(to) => format!("{} → {}", area_label(from), area_label(to)),
-                        None => trf("field.from", &[&area_label(from)]),
-                    };
-                    ui.label(RichText::new(place).weak().small());
-                    ui.separator();
-                    let mut action_button = |ui: &mut egui::Ui, a: Action, small: bool| {
+                    let mut action_button = |ui: &mut egui::Ui, a: Action| {
                         let a = match a {
                             Action::Chain(_) => Action::Chain(new_chain_no),
                             other => other,
                         };
                         ui.horizontal(|ui| {
-                            let text = match a {
-                                Action::Chain(_) => tr("action.chain").to_string(),
-                                other => other.label(),
-                            };
-                            let width = if matches!(a, Action::Chain(_)) {
-                                150.0
+                            let is_chain = matches!(a, Action::Chain(_));
+                            let text = if is_chain {
+                                tr("action.chain").to_string()
                             } else {
-                                210.0
+                                a.label()
                             };
-                            let button = if small {
-                                egui::Button::new(RichText::new(text).small())
-                            } else {
-                                egui::Button::new(text)
-                            };
-                            if ui.add(button.min_size(Vec2::new(width, 0.0))).clicked() {
+                            let width = if is_chain { 150.0 } else { 210.0 };
+                            let button = egui::Button::new(text).min_size(Vec2::new(width, 0.0));
+                            if ui.add(button).clicked() {
                                 chosen = Some(a);
                             }
-                            if matches!(a, Action::Chain(_)) {
+                            if is_chain {
                                 ui.add(egui::DragValue::new(&mut new_chain_no).range(1..=99))
                                     .on_hover_text(tr("action.chain_number"));
                             }
                         });
                     };
-                    for a in &actions {
-                        action_button(ui, *a, false);
-                    }
-                    if only.is_none() {
-                        ui.separator();
-                        if ui
-                            .selectable_label(show_all, tr("field.more_actions"))
-                            .clicked()
-                        {
-                            toggle_all = true;
-                        }
-                        if show_all {
-                            egui::ScrollArea::vertical()
-                                .max_height(260.0)
-                                .show(ui, |ui| {
-                                    for g in Action::GROUPS {
+                    ui.horizontal_top(|ui| {
+                        // Linke Spalte: die üblichen Aktionen.
+                        ui.vertical(|ui| {
+                            ui.set_width(210.0);
+                            ui.label(RichText::new(shown_name(cx.v, &slot)).strong());
+                            let place = match to {
+                                Some(to) => format!("{} → {}", area_label(from), area_label(to)),
+                                None => trf("field.from", &[&area_label(from)]),
+                            };
+                            ui.label(RichText::new(place).weak().small());
+                            ui.separator();
+                            for a in &actions {
+                                action_button(ui, *a);
+                            }
+                            if only.is_none() {
+                                ui.separator();
+                                if ui
+                                    .selectable_label(show_all, tr("field.more_actions"))
+                                    .clicked()
+                                {
+                                    toggle_all = true;
+                                }
+                            }
+                        });
+                        // Weitere Aktionen: alle übrigen, in 3 Spalten daneben
+                        // und in voller Größe (kein Scrollen).
+                        if show_all && only.is_none() {
+                            let columns: [&[usize]; 3] = [&[0, 2], &[1], &[3, 4]];
+                            for groups in columns {
+                                ui.separator();
+                                ui.vertical(|ui| {
+                                    ui.set_width(210.0);
+                                    for gi in groups {
+                                        let g = &Action::GROUPS[*gi];
                                         let rest: Vec<Action> = g
                                             .actions
                                             .iter()
@@ -714,15 +748,17 @@ impl FieldUi {
                                             continue;
                                         }
                                         ui.label(
-                                            RichText::new(tr(g.key)).color(SELECT_COLOR).small(),
+                                            RichText::new(tr(g.key)).color(SELECT_COLOR).strong(),
                                         );
                                         for a in rest {
-                                            action_button(ui, a, true);
+                                            action_button(ui, a);
                                         }
+                                        ui.add_space(6.0);
                                     }
                                 });
+                            }
                         }
-                    }
+                    });
                 });
             });
 
