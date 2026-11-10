@@ -259,7 +259,26 @@ impl FieldUi {
         };
 
         ui.horizontal_top(|ui| {
-            ui.add_space(pad);
+            if self.open_pile.is_some() {
+                // Spalte links vom Feld: 1 bis 3 Karten breit, direkt am Feld.
+                let card_w = w * 0.85;
+                let one = card_w + 14.0;
+                let cols = ((pad - 14.0) / (card_w + gap.x)).floor().clamp(1.0, 3.0);
+                let panel_w = (cols * (card_w + gap.x) + 14.0).max(one);
+                let lead = (pad - panel_w - gap.x).max(0.0);
+                ui.add_space(lead);
+                let board_h = 4.0 * w * CARD_RATIO + 3.0 * gap.y;
+                ui.allocate_ui_with_layout(
+                    Vec2::new(panel_w, board_h),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| {
+                        ui.set_width(panel_w);
+                        self.pile_panel(ui, &mut cx, card_w, board_h - 50.0);
+                    },
+                );
+            } else {
+                ui.add_space(pad);
+            }
             ui.vertical(|ui| {
                 ui.set_width(board_w);
                 self.status_line(ui);
@@ -386,34 +405,43 @@ impl FieldUi {
                 );
             }
         }
+    }
 
-        // Aufgeklappter Stapel
-        if let Some(area) = self.open_pile {
-            let cards = match area {
-                Area::Gy => &board.gy,
-                Area::Banished => &board.banished,
-                Area::Overlay => &board.overlay,
-                _ => &board.extra_face_up,
-            };
-            ui.add_space(4.0);
-            ui.horizontal(|ui| {
-                ui.label(RichText::new(area_label(area)).strong());
-                if area == Area::ExtraDeck && ui.small_button(tr("field.from_extra")).clicked() {
-                    cx.event = Some(FieldEvent::Pick(Area::ExtraDeck));
-                }
-                if ui.small_button(tr("field.close_pile")).clicked() {
-                    self.open_pile = None;
-                }
+    /// Aufgeklappter Stapel (Friedhof, Verbannt, …) als Spalte links neben
+    /// dem Feld. So muss man nicht scrollen, und das Aktionsmenü, das nach
+    /// rechts aufgeht, verdeckt die Karten nicht.
+    fn pile_panel(&mut self, ui: &mut egui::Ui, cx: &mut Cx, card_w: f32, max_h: f32) {
+        let Some(area) = self.open_pile else { return };
+        let board = cx.board;
+        let cards = match area {
+            Area::Gy => &board.gy,
+            Area::Banished => &board.banished,
+            Area::Overlay => &board.overlay,
+            _ => &board.extra_face_up,
+        };
+        ui.label(RichText::new(area_label(area)).strong());
+        ui.horizontal_wrapped(|ui| {
+            if area == Area::ExtraDeck && ui.small_button(tr("field.from_extra")).clicked() {
+                cx.event = Some(FieldEvent::Pick(Area::ExtraDeck));
+            }
+            if ui.small_button(tr("field.close_pile")).clicked() {
+                self.open_pile = None;
+            }
+        });
+        egui::ScrollArea::vertical()
+            .id_salt("open_pile")
+            .max_height(max_h)
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    // Neueste Karte zuerst.
+                    for c in cards.iter().rev() {
+                        self.card(ui, cx, c, area, card_w, Marks::default());
+                    }
+                    if cards.is_empty() {
+                        ui.label(RichText::new(tr("field.pile_empty")).weak());
+                    }
+                });
             });
-            ui.horizontal_wrapped(|ui| {
-                for c in cards.iter() {
-                    self.card(ui, cx, c, area, w * 0.8, Marks::default());
-                }
-                if cards.is_empty() {
-                    ui.label(RichText::new(tr("field.pile_empty")).weak());
-                }
-            });
-        }
     }
 
     /// Zeichnet eine Karte, die man anklicken und ziehen kann.
