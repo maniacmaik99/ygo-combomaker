@@ -57,7 +57,7 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 - **Sprachen:** Englisch, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch (Einstellungen → Sprache). Kartennamen optional in der gewählten Sprache (außer Spanisch, das bietet die Kartendatenbank nicht an).
 - **Bedienung wie im Spiel:** Karte anklicken → direkt an der Karte erscheint ein Menü mit den Aktionen, die an diesem Ort üblich sind (z. B. Hand: Normalbeschwörung, Spezialbeschwörung, Setzen, Effekt aktivieren). Oder die Karte mit der Maus auf eine Zone, den Friedhof, den Verbannt-Stapel oder die Hand ziehen. Deck und Extra Deck sind Stapel auf dem Feld. Esc oder Rechtsklick bricht ab, Strg+Z macht den letzten aufgenommenen Zug rückgängig. Optional wählt die App freie Zonen automatisch (Einstellungen).
 - **Tipp beim Üben:** markiert die Karte des nächsten Zugs.
-- **Handtest:** zieht eine zufällige Starthand aus einer Deckliste, zeigt, welche gespeicherten Combos damit spielbar sind, und simuliert 1000 Hände (Anteil der Hände, mit denen eine Combo spielbar ist).
+- **Handtest:** zieht eine zufällige Starthand aus einer Deckliste, zeigt, welche gespeicherten Combos damit spielbar sind, und simuliert 1000 Hände (Anteil der Hände, mit denen eine Combo spielbar ist). Als benötigt zählen nur die Karten der Starthand, die in den Schritten der Combo auch benutzt werden.
 - **Suche in der Combo-Liste.**
 - **Freies Spiel im Handtest:** Die gezogene Hand lässt sich auf einem Spielfeld frei ausspielen (ohne Prüfung, mit Rückgängig).
 - **Kartengrößen:** getrennte Regler für die Kartengröße in Listen (bis 280) und im Fenster „Karte suchen“ (bis 220).

@@ -566,6 +566,8 @@ pub const T: &[(&str, &str)] = &[
     ("handtest.play_title", "Free play"),
     ("handtest.play_reset", "Start again with this hand"),
     ("handtest.play_close", "Close board"),
+    ("handtest.needs", "needs: {0}"),
+    ("handtest.any_card", "any card"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

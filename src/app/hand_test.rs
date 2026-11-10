@@ -77,6 +77,37 @@ pub fn needs_of(starting_hand: &[Entry]) -> Vec<Option<u32>> {
     starting_hand.iter().map(|e| e.slot.card_id()).collect()
 }
 
+/// Die Karten, die eine Combo wirklich auf der Starthand braucht:
+/// nur die Karten der Starthand, die in den Schritten auch benutzt werden.
+/// Karten, die nur „dabei“ sind (z. B. eine eingetragene Hand mit 5 Karten,
+/// von denen die Combo 2 benutzt), zählen nicht. Ein Platzhalter zählt,
+/// wenn in den Schritten ein Platzhalter vorkommt.
+/// Benutzt die Combo keine Karte der Starthand (z. B. noch keine Schritte),
+/// gilt die ganze Starthand.
+pub fn needs_of_combo(combo: &Combo) -> Vec<Option<u32>> {
+    let used: Vec<&Slot> = combo
+        .steps
+        .iter()
+        .flat_map(|s| &s.parts)
+        .map(|p| &p.entry.slot)
+        .collect();
+    let any_placeholder = used.iter().any(|s| s.card_id().is_none());
+    let needed: Vec<Option<u32>> = combo
+        .starting_hand
+        .iter()
+        .map(|e| e.slot.card_id())
+        .filter(|id| match id {
+            Some(id) => used.iter().any(|s| s.card_id() == Some(*id)),
+            None => any_placeholder,
+        })
+        .collect();
+    if needed.is_empty() {
+        needs_of(&combo.starting_hand)
+    } else {
+        needed
+    }
+}
+
 /// Ist die Combo mit dieser Hand spielbar? Jede echte Karte muss in der
 /// Hand sein (mehrfache Karten entsprechend oft). Jeder Platzhalter braucht
 /// eine weitere, noch nicht verwendete Karte. Eine leere Starthand ist nie
@@ -148,7 +179,7 @@ pub fn playable_combos(combos: &[Combo], deck_id: Uuid, hand: &[u32]) -> Vec<usi
     let mut out: Vec<usize> = combos
         .iter()
         .enumerate()
-        .filter(|(_, c)| is_playable(&needs_of(&c.starting_hand), hand))
+        .filter(|(_, c)| is_playable(&needs_of_combo(c), hand))
         .map(|(i, _)| i)
         .collect();
     // `sort_by_key` ist stabil: die Reihenfolge der Liste bleibt erhalten.
@@ -411,10 +442,8 @@ impl ComboApp {
                 .iter()
                 .filter(|c| !c.starting_hand.is_empty())
                 .collect();
-            let needs: Vec<Vec<Option<u32>>> = with_hand
-                .iter()
-                .map(|c| needs_of(&c.starting_hand))
-                .collect();
+            let needs: Vec<Vec<Option<u32>>> =
+                with_hand.iter().map(|c| needs_of_combo(c)).collect();
             let counts = simulate(&ids, &needs, hand_size, SIM_RUNS, &mut self.hand_test.rng);
             self.hand_test.sim = Some(SimResult {
                 deck_id,
@@ -506,7 +535,7 @@ impl ComboApp {
                     ui.label(RichText::new(tr("handtest.stats_no_combos")).weak());
                 } else {
                     egui::Grid::new("hand_test_stats")
-                        .num_columns(2)
+                        .num_columns(3)
                         .striped(true)
                         .show(ui, |ui| {
                             for (id, count) in &sim.per_combo {
@@ -519,6 +548,18 @@ impl ComboApp {
                                     "handtest.stats_percent",
                                     &[&percent(*count, sim.runs, comma)],
                                 ));
+                                // Welche Karten für diese Combo gezählt wurden.
+                                let names: Vec<String> = needs_of_combo(c)
+                                    .iter()
+                                    .map(|id| match id.and_then(|id| v.db.get(id)) {
+                                        Some(card) => card.localized_name(v.name_lang).to_string(),
+                                        None => tr("handtest.any_card").to_string(),
+                                    })
+                                    .collect();
+                                ui.label(
+                                    RichText::new(trf("handtest.needs", &[&names.join(" + ")]))
+                                        .weak(),
+                                );
                                 ui.end_row();
                             }
                         });
@@ -685,6 +726,30 @@ mod tests {
         assert_eq!(r.runs, 100);
         assert_eq!(r.per_combo, vec![100, 0, 0]);
         assert_eq!(r.any, 100);
+    }
+
+    #[test]
+    fn only_cards_used_in_steps_are_needed() {
+        use crate::model::{Connector, Step, StepPart};
+        let mut c = Combo::new("x");
+        // Eingetragene Hand mit 3 Karten, die Schritte benutzen nur Karte 1.
+        c.starting_hand = vec![card(1), card(2), card(3)];
+        assert_eq!(needs_of_combo(&c).len(), 3); // ohne Schritte: ganze Hand
+        c.steps = vec![Step {
+            parts: vec![
+                StepPart {
+                    connector: Connector::Then,
+                    entry: card(1),
+                },
+                StepPart {
+                    connector: Connector::Then,
+                    entry: card(9),
+                },
+            ],
+            note: String::new(),
+        }];
+        assert_eq!(needs_of_combo(&c), vec![Some(1)]);
+        assert!(is_playable(&needs_of_combo(&c), &[1, 7, 8]));
     }
 
     #[test]

@@ -65,6 +65,9 @@ pub struct FieldUi {
     extra_rect: Option<Rect>,
 }
 
+/// Inhalt der Spalte rechts neben dem Feld.
+pub type SideFn<'a> = &'a mut dyn FnMut(&mut egui::Ui, &mut ImageCache);
+
 /// Was die Spielfeld-Oberfläche in diesem Frame ausgelöst hat.
 pub enum FieldEvent {
     Move(Move),
@@ -224,6 +227,22 @@ impl FieldUi {
         width: f32,
         auto_zone: bool,
     ) -> Option<FieldEvent> {
+        self.show_with_side(ui, board, images, v, width, auto_zone, None)
+    }
+
+    /// Wie [`Self::show`], zeichnet aber zusätzlich `side` in eine Spalte
+    /// rechts neben dem Feld (z. B. Rückmeldungen beim Üben).
+    #[allow(clippy::too_many_arguments)]
+    pub fn show_with_side(
+        &mut self,
+        ui: &mut egui::Ui,
+        board: &Board,
+        images: &mut ImageCache,
+        v: View,
+        width: f32,
+        auto_zone: bool,
+        side: Option<SideFn<'_>>,
+    ) -> Option<FieldEvent> {
         let ctx = ui.ctx().clone();
         // Abbrechen mit Esc oder Rechtsklick.
         if ctx.input(|i| i.key_pressed(egui::Key::Escape) || i.pointer.secondary_clicked()) {
@@ -247,7 +266,13 @@ impl FieldUi {
         let by_height = (screen_h - 430.0 - 3.0 * gap.y) / (4.0 * CARD_RATIO);
         let w = by_width.min(by_height).clamp(width.min(56.0), 170.0);
         let board_w = 7.0 * w + 6.0 * gap.x;
-        let pad = ((avail_w - board_w) / 2.0).max(0.0);
+        let mut pad = ((avail_w - board_w) / 2.0).max(0.0);
+        // Mit Seitenspalte: rechts mindestens 220 Pixel frei lassen.
+        const SIDE_MIN: f32 = 220.0;
+        if side.is_some() && pad < SIDE_MIN + gap.x {
+            pad = (avail_w - board_w - SIDE_MIN - gap.x).max(0.0);
+        }
+        let side_w = (avail_w - pad - board_w - 2.0 * gap.x).max(120.0);
         let mut cx = Cx {
             board,
             images,
@@ -281,9 +306,26 @@ impl FieldUi {
             }
             ui.vertical(|ui| {
                 ui.set_width(board_w);
-                self.status_line(ui);
+                ui.set_max_width(board_w);
+                // Feste Höhe (2 Zeilen), damit das Feld nicht springt.
+                ui.allocate_ui_with_layout(
+                    Vec2::new(board_w, 44.0),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| {
+                        ui.set_min_height(44.0);
+                        self.status_line(ui);
+                    },
+                );
                 self.board_ui(ui, &mut cx);
             });
+            if let Some(side) = side {
+                ui.vertical(|ui| {
+                    ui.set_width(side_w.min(360.0));
+                    // Auf Höhe der obersten Feldreihe beginnen.
+                    ui.add_space(50.0);
+                    side(ui, cx.images);
+                });
+            }
         });
         self.menu(&ctx, &mut cx);
         self.drag_and_drop(&ctx, &mut cx);
@@ -302,7 +344,7 @@ impl FieldUi {
     }
 
     fn status_line(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| match &self.pending {
+        ui.horizontal_wrapped(|ui| match &self.pending {
             Pending::Zone {
                 slot: _, action, ..
             } => {

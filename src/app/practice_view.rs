@@ -154,34 +154,42 @@ impl ComboApp {
                         .on_hover_text(tr("practice.reveal_hint"))
                         .clicked();
                 });
+            }
+            ui.add_space(4.0);
+
+            // Rechts neben dem Feld: Rückmeldung, Notiz zum Schritt und die
+            // in diesem Schritt erledigten Züge. So verschiebt sich das Feld nicht.
+            let feedback = p.feedback.clone();
+            let current = p.session.current();
+            let mut side = |ui: &mut egui::Ui, images: &mut crate::images::ImageCache| {
+                if let Some((text, ok)) = &feedback {
+                    let color = if *ok { GOOD_COLOR } else { BAD_COLOR };
+                    ui.label(RichText::new(text).color(color).size(17.0).strong());
+                    ui.add_space(6.0);
+                }
+                let Some((si, pi)) = current else { return };
                 if !combo.steps[si].note.is_empty() {
                     ui.label(RichText::new(&combo.steps[si].note).italics());
+                    ui.add_space(6.0);
                 }
                 if pi > 0 {
                     let done = crate::model::Step {
                         parts: combo.steps[si].parts[..pi].to_vec(),
                         note: String::new(),
                     };
-                    ui.horizontal(|ui| {
-                        ui.label(tr("practice.done_in_step"));
-                        step_row(ui, &mut self.images, v, &done, width * 0.6, &|_| {
-                            Some(GOOD_COLOR)
-                        });
-                    });
+                    ui.label(RichText::new(tr("practice.done_in_step")).weak());
+                    step_row(ui, images, v, &done, 52.0, &|_| Some(GOOD_COLOR));
                 }
-            }
-            if let Some((text, ok)) = &p.feedback {
-                let color = if *ok { GOOD_COLOR } else { BAD_COLOR };
-                ui.label(RichText::new(text).color(color).size(16.0).strong());
-            } else {
-                // Platz frei halten, damit das Spielfeld nicht springt.
-                ui.label(RichText::new(" ").size(16.0));
-            }
-            ui.add_space(4.0);
-
-            let event = p
-                .field
-                .show(ui, &p.session.board, &mut self.images, v, width, auto_zone);
+            };
+            let event = p.field.show_with_side(
+                ui,
+                &p.session.board,
+                &mut self.images,
+                v,
+                width,
+                auto_zone,
+                Some(&mut side),
+            );
             match event {
                 Some(FieldEvent::Pick(area)) => {
                     p.feedback = None;
