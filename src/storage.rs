@@ -59,6 +59,8 @@ pub struct Settings {
     pub card_width: f32,
     /// Beim Start automatisch nach Updates suchen.
     pub auto_update_check: bool,
+    /// Spielfeld: freie Zone automatisch wählen statt anklicken.
+    pub auto_zone: bool,
     /// Alt: GitHub-Token für Updates aus dem damals privaten Repo.
     /// Wird nicht mehr angezeigt, aber noch benutzt, falls vorhanden.
     pub github_token: String,
@@ -72,6 +74,7 @@ impl Default for Settings {
             md_only: true,
             card_width: 72.0,
             auto_update_check: true,
+            auto_zone: false,
             github_token: String::new(),
         }
     }

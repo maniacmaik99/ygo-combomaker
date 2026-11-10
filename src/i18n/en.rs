@@ -536,4 +536,75 @@ pub const T: &[(&str, &str)] = &[
     ("badge.negate", "Neg"),
     ("badge.target", "Target"),
     ("badge.change_position", "Pos"),
+    (
+        "field.status_idle",
+        "Click a card to see its actions, or drag it to a zone. Esc or right-click cancels.",
+    ),
+    ("field.more_actions", "More actions …"),
+    ("field.deck_hint", "Click: choose a card from here."),
+    ("cell.deck", "Deck"),
+    ("practice.hint", "Hint"),
+    (
+        "practice.hint_hint",
+        "Marks the card of the next move in green. The move then no longer counts as right on the first try.",
+    ),
+    ("practice.hint_text", "Hint: the next move uses {0}."),
+    ("editor.meta", "Combo details (title, deck, notes, share)"),
+    (
+        "editor.hand_click_hint",
+        "Click a card to remove it. The board below is rebuilt automatically.",
+    ),
+    ("rec.undo_hint", "Shortcut: Ctrl+Z"),
+    ("settings.auto_zone", "Board: choose the zone automatically"),
+    (
+        "settings.auto_zone_hint",
+        "On: a summoned or placed card goes to the first free zone. Off: you click the zone.",
+    ),
+    // Hand test, combo filter
+    ("view.hand_test", "Hand test"),
+    ("combo.filter_hint", "Search combos …"),
+    ("combo.filter_no_match", "No combo matches the search."),
+    (
+        "handtest.no_decks",
+        "You have no deck yet. Create a deck under \"Decks\" first.",
+    ),
+    (
+        "handtest.intro",
+        "Draw a random starting hand from the Main Deck. Below the hand you see which saved combos are playable with it.",
+    ),
+    ("handtest.deck", "Deck:"),
+    ("handtest.main_deck_count", "Main Deck: {0} cards"),
+    (
+        "handtest.deck_empty",
+        "This deck has no Main Deck cards. Add cards under \"Decks\" first.",
+    ),
+    ("handtest.hand_size", "Hand size:"),
+    ("handtest.draw", "Draw hand"),
+    ("handtest.simulate", "Simulate {0} hands"),
+    (
+        "handtest.simulate_hint",
+        "Draws many random hands and counts how often each combo is playable.",
+    ),
+    (
+        "handtest.no_hand",
+        "No hand drawn yet. Click \"Draw hand\".",
+    ),
+    ("handtest.hand", "Your hand"),
+    ("handtest.playable", "Playable combos"),
+    (
+        "handtest.none_playable",
+        "No saved combo is playable with this hand.",
+    ),
+    ("handtest.open", "Open"),
+    ("handtest.linked", "(linked to this deck)"),
+    (
+        "handtest.stats_title",
+        "Statistics: {0} hands with {1} cards each",
+    ),
+    (
+        "handtest.stats_no_combos",
+        "No combo has a starting hand. Add a starting hand to a combo first.",
+    ),
+    ("handtest.stats_percent", "{0} %"),
+    ("handtest.stats_any", "At least one combo playable: {0} %"),
 ];

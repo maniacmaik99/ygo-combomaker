@@ -7,6 +7,7 @@
 mod decks_view;
 mod editor;
 mod field;
+mod hand_test;
 mod picker;
 mod practice_view;
 mod widgets;
@@ -32,6 +33,8 @@ enum View {
     Edit,
     Practice,
     Decks,
+    /// Zufällige Starthand aus einem Deck ziehen.
+    HandTest,
 }
 
 /// Wie Combos im Editor bearbeitet werden.
@@ -75,6 +78,8 @@ struct Recorder {
     combo_id: uuid::Uuid,
     board: Board,
     field: FieldUi,
+    /// Starthand, mit der das Feld aufgebaut wurde.
+    hand: Vec<crate::model::Slot>,
 }
 
 /// Übung auf dem Spielfeld.
@@ -113,6 +118,8 @@ pub struct ComboApp {
     saved_settings: Settings,
     combos: Vec<Combo>,
     selected: Option<usize>,
+    /// Suchtext für die Combo-Liste.
+    combo_filter: String,
     view: View,
     edit_mode: EditMode,
     db: CardDb,
@@ -133,6 +140,7 @@ pub struct ComboApp {
     deck_import: Option<(String, String)>,
     archetype_query: String,
     confirm_delete_deck: Option<usize>,
+    hand_test: hand_test::HandTestState,
     message: Option<String>,
     update: UpdateState,
     update_rx: Option<Receiver<UpdateMsg>>,
@@ -160,6 +168,7 @@ impl ComboApp {
             settings,
             selected: if combos.is_empty() { None } else { Some(0) },
             combos,
+            combo_filter: String::new(),
             view: View::Edit,
             edit_mode: EditMode::Field,
             db: CardDb::default(),
@@ -179,6 +188,7 @@ impl ComboApp {
             deck_import: None,
             archetype_query: String::new(),
             confirm_delete_deck: None,
+            hand_test: hand_test::HandTestState::default(),
             message,
             update: UpdateState::Idle,
             update_rx: None,
@@ -493,7 +503,7 @@ impl eframe::App for ComboApp {
                     .inner_margin(egui::Margin::symmetric(10, 6)),
             )
             .show(ui, |ui| self.top_bar(ui));
-        if self.view != View::Decks {
+        if !matches!(self.view, View::Decks | View::HandTest) {
             egui::Panel::left("combo_list")
                 .resizable(true)
                 .default_size(230.0)
@@ -503,6 +513,7 @@ impl eframe::App for ComboApp {
             View::Edit => self.editor(ui),
             View::Practice => self.practice_view(ui),
             View::Decks => self.decks_view(ui),
+            View::HandTest => self.hand_test_view(ui),
         });
 
         self.picker_window(&ctx);
@@ -525,8 +536,15 @@ impl ComboApp {
             ui.selectable_value(&mut self.view, View::Edit, tr("view.edit"));
             ui.selectable_value(&mut self.view, View::Practice, tr("view.practice"));
             ui.selectable_value(&mut self.view, View::Decks, tr("view.decks"));
+            ui.selectable_value(&mut self.view, View::HandTest, tr("view.hand_test"));
             ui.separator();
-            ui.menu_button(tr("settings.title"), |ui| self.settings_menu(ui));
+            // Das Menü bleibt offen, bis man außerhalb klickt.
+            egui::containers::menu::MenuButton::new(tr("settings.title"))
+                .config(
+                    egui::containers::menu::MenuConfig::new()
+                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside),
+                )
+                .ui(ui, |ui| self.settings_menu(ui));
             let busy_update = matches!(
                 self.update,
                 UpdateState::Checking | UpdateState::Installing(_)
@@ -587,6 +605,8 @@ impl ComboApp {
             egui::Slider::new(&mut self.settings.card_width, 48.0..=140.0)
                 .text(tr("settings.card_size")),
         );
+        ui.checkbox(&mut self.settings.auto_zone, tr("settings.auto_zone"))
+            .on_hover_text(tr("settings.auto_zone_hint"));
         ui.checkbox(
             &mut self.settings.auto_update_check,
             tr("settings.auto_update"),
@@ -613,11 +633,26 @@ impl ComboApp {
                 self.import_text = Some(String::new());
             }
         });
+        ui.add(
+            TextEdit::singleline(&mut self.combo_filter)
+                .hint_text(tr("combo.filter_hint"))
+                .desired_width(f32::INFINITY),
+        );
         ui.separator();
+        // Filter: Titel oder Deck enthält den Suchtext (ohne Groß/Klein).
+        let filter = self.combo_filter.trim().to_lowercase();
+        let mut shown = 0;
         let mut new_sel = None;
         let mut duplicate = None;
         egui::ScrollArea::vertical().show(ui, |ui| {
             for (i, c) in self.combos.iter().enumerate() {
+                if !filter.is_empty()
+                    && !c.title.to_lowercase().contains(&filter)
+                    && !c.deck.to_lowercase().contains(&filter)
+                {
+                    continue;
+                }
+                shown += 1;
                 let title = if c.title.is_empty() {
                     tr("combo.untitled")
                 } else {
@@ -644,6 +679,8 @@ impl ComboApp {
             }
             if self.combos.is_empty() {
                 ui.label(RichText::new(tr("combo.list_empty")).weak());
+            } else if shown == 0 {
+                ui.label(RichText::new(tr("combo.filter_no_match")).weak());
             }
         });
         if let Some(i) = new_sel

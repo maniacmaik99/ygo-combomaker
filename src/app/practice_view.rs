@@ -40,21 +40,8 @@ impl ComboApp {
                 ui.label(tr("practice.no_steps"));
                 return;
             }
-            let moves: usize = c.steps.iter().map(|s| s.parts.len()).sum();
-            ui.label(trf("practice.summary", &[&c.steps.len(), &moves]));
-            ui.label(trf(
-                "practice.stats",
-                &[&c.practice.attempts, &c.practice.best_percent],
-            ));
-            ui.add_space(8.0);
-            ui.label(tr("practice.intro"));
-            if ui
-                .button(RichText::new(tr("practice.start")).strong())
-                .clicked()
-            {
-                self.start_practice(idx);
-            }
-            return;
+            // Die Übung startet sofort, ohne Zwischenseite.
+            self.start_practice(idx);
         }
 
         // Ergebnis einmalig speichern, wenn die Übung fertig ist.
@@ -77,6 +64,8 @@ impl ComboApp {
         };
         let combo = &self.combos[idx];
         let p = self.practice.as_mut().expect("practice");
+        let auto_zone = self.settings.auto_zone;
+        let mut hint = false;
         let mut reveal = false;
         let mut restart = false;
         let mut stop = false;
@@ -93,6 +82,14 @@ impl ComboApp {
                 ));
                 ui.separator();
                 ui.label(trf("practice.mistakes", &[&p.session.mistakes]));
+                ui.separator();
+                ui.label(
+                    RichText::new(trf(
+                        "practice.stats",
+                        &[&combo.practice.attempts, &combo.practice.best_percent],
+                    ))
+                    .weak(),
+                );
                 ui.separator();
                 ui.checkbox(&mut p.session.show_endboard, tr("practice.show_endboard"));
                 restart = ui.button(tr("practice.restart")).clicked();
@@ -148,6 +145,10 @@ impl ComboApp {
                         "practice.move_in_step",
                         &[&(pi + 1), &combo.steps[si].parts.len()],
                     ));
+                    hint = ui
+                        .button(tr("practice.hint"))
+                        .on_hover_text(tr("practice.hint_hint"))
+                        .clicked();
                     reveal = ui
                         .button(tr("practice.reveal"))
                         .on_hover_text(tr("practice.reveal_hint"))
@@ -172,12 +173,15 @@ impl ComboApp {
             if let Some((text, ok)) = &p.feedback {
                 let color = if *ok { GOOD_COLOR } else { BAD_COLOR };
                 ui.label(RichText::new(text).color(color).size(16.0).strong());
+            } else {
+                // Platz frei halten, damit das Spielfeld nicht springt.
+                ui.label(RichText::new(" ").size(16.0));
             }
             ui.add_space(4.0);
 
             let event = p
                 .field
-                .show(ui, &p.session.board, &mut self.images, v, width);
+                .show(ui, &p.session.board, &mut self.images, v, width, auto_zone);
             match event {
                 Some(FieldEvent::Pick(area)) => {
                     p.feedback = None;
@@ -200,6 +204,21 @@ impl ComboApp {
             self.open_picker(Target::PracticeFrom(area));
         }
 
+        let name_lang = self.name_lang();
+        if hint
+            && let Some(p) = &mut self.practice
+            && let Some(slot) = p.session.hint(&self.combos[idx])
+        {
+            let name = super::widgets::shown_name(
+                CardView {
+                    db: &self.db,
+                    name_lang,
+                },
+                &slot,
+            );
+            p.feedback = Some((trf("practice.hint_text", &[&name]), false));
+            p.field.hint = Some(slot);
+        }
         if reveal {
             let db = &self.db;
             let combo = &self.combos[idx];
@@ -227,6 +246,7 @@ impl ComboApp {
         }
         if stop {
             self.practice = None;
+            self.view = super::View::Edit;
         }
     }
 }

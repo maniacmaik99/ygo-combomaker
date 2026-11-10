@@ -587,4 +587,78 @@ pub const T: &[(&str, &str)] = &[
     ("badge.negate", "Negar"),
     ("badge.target", "Alvo"),
     ("badge.change_position", "Pos"),
+    (
+        "field.status_idle",
+        "Clique em um card para ver suas ações, ou arraste-o para uma zona. Esc ou clique direito cancela.",
+    ),
+    ("field.more_actions", "Mais ações …"),
+    ("field.deck_hint", "Clique: escolher um card daqui."),
+    ("cell.deck", "Deck"),
+    ("practice.hint", "Dica"),
+    (
+        "practice.hint_hint",
+        "Marca em verde o card da próxima jogada. A jogada deixa de contar como certa na primeira tentativa.",
+    ),
+    ("practice.hint_text", "Dica: a próxima jogada usa {0}."),
+    (
+        "editor.meta",
+        "Dados do combo (título, deck, notas, compartilhar)",
+    ),
+    (
+        "editor.hand_click_hint",
+        "Clique em um card para removê-lo. O campo abaixo é reconstruído automaticamente.",
+    ),
+    ("rec.undo_hint", "Atalho: Ctrl+Z"),
+    ("settings.auto_zone", "Board: choose the zone automatically"),
+    (
+        "settings.auto_zone_hint",
+        "On: a summoned or placed card goes to the first free zone. Off: you click the zone.",
+    ),
+    // Hand test, combo filter
+    ("view.hand_test", "Teste de mão"),
+    ("combo.filter_hint", "Buscar combos …"),
+    ("combo.filter_no_match", "Nenhum combo corresponde à busca."),
+    (
+        "handtest.no_decks",
+        "Você ainda não tem nenhum Deck. Crie primeiro um Deck em “Decks”.",
+    ),
+    (
+        "handtest.intro",
+        "Compre uma mão inicial aleatória do Deck Principal. Abaixo da mão você vê quais combos salvos podem ser jogados com ela.",
+    ),
+    ("handtest.deck", "Deck:"),
+    ("handtest.main_deck_count", "Deck Principal: {0} cards"),
+    (
+        "handtest.deck_empty",
+        "Este Deck não tem cards no Deck Principal. Adicione primeiro cards em “Decks”.",
+    ),
+    ("handtest.hand_size", "Tamanho da mão:"),
+    ("handtest.draw", "Comprar mão"),
+    ("handtest.simulate", "Simular {0} mãos"),
+    (
+        "handtest.simulate_hint",
+        "Compra muitas mãos aleatórias e conta quantas vezes cada combo pode ser jogado.",
+    ),
+    (
+        "handtest.no_hand",
+        "Nenhuma mão comprada ainda. Clique em “Comprar mão”.",
+    ),
+    ("handtest.hand", "Sua mão"),
+    ("handtest.playable", "Combos jogáveis"),
+    (
+        "handtest.none_playable",
+        "Nenhum combo salvo pode ser jogado com esta mão.",
+    ),
+    ("handtest.open", "Abrir"),
+    ("handtest.linked", "(vinculado a este Deck)"),
+    (
+        "handtest.stats_title",
+        "Estatísticas: {0} mãos de {1} cards cada",
+    ),
+    (
+        "handtest.stats_no_combos",
+        "Nenhum combo tem mão inicial. Adicione primeiro uma mão inicial a um combo.",
+    ),
+    ("handtest.stats_percent", "{0} %"),
+    ("handtest.stats_any", "Pelo menos um combo jogável: {0} %"),
 ];

@@ -121,6 +121,16 @@ impl Session {
         Ok(Verdict::Correct)
     }
 
+    /// Tipp: nennt die Karte des nächsten Zugs (nicht die Aktion).
+    /// Der Zug zählt danach nicht mehr als „beim ersten Versuch richtig“.
+    /// Bei einem Platzhalter gibt es keinen Tipp.
+    pub fn hint(&mut self, combo: &Combo) -> Option<Slot> {
+        let slot = self.expected(combo)?.slot.clone();
+        slot.card_id()?;
+        self.current_failed = true;
+        Some(slot)
+    }
+
     /// Zeigt den erwarteten Zug, führt ihn aus und zählt ihn als falsch.
     /// `card_info` liefert zu einer Karte die Kartenart und ob sie ins
     /// Extra Deck gehört.

@@ -602,4 +602,84 @@ pub const T: &[(&str, &str)] = &[
     ("badge.negate", "Annul"),
     ("badge.target", "Cible"),
     ("badge.change_position", "Pos"),
+    (
+        "field.status_idle",
+        "Clique sur une carte pour voir ses actions, ou fais-la glisser vers une zone. Échap ou clic droit annule.",
+    ),
+    ("field.more_actions", "Autres actions …"),
+    ("field.deck_hint", "Clic : choisir une carte ici."),
+    ("cell.deck", "Deck"),
+    ("practice.hint", "Indice"),
+    (
+        "practice.hint_hint",
+        "Marque en vert la carte du prochain coup. Le coup ne compte alors plus comme réussi du premier essai.",
+    ),
+    (
+        "practice.hint_text",
+        "Indice : le prochain coup utilise {0}.",
+    ),
+    (
+        "editor.meta",
+        "Détails de la combo (titre, deck, notes, partage)",
+    ),
+    (
+        "editor.hand_click_hint",
+        "Clique sur une carte pour la retirer. Le terrain en dessous est reconstruit automatiquement.",
+    ),
+    ("rec.undo_hint", "Raccourci : Ctrl+Z"),
+    ("settings.auto_zone", "Board: choose the zone automatically"),
+    (
+        "settings.auto_zone_hint",
+        "On: a summoned or placed card goes to the first free zone. Off: you click the zone.",
+    ),
+    // Hand test, combo filter
+    ("view.hand_test", "Test de main"),
+    ("combo.filter_hint", "Chercher des combos …"),
+    (
+        "combo.filter_no_match",
+        "Aucun combo ne correspond à la recherche.",
+    ),
+    (
+        "handtest.no_decks",
+        "Tu n'as pas encore de deck. Crée d'abord un deck dans « Decks ».",
+    ),
+    (
+        "handtest.intro",
+        "Pioche une main de départ aléatoire dans le Main Deck. Sous la main, tu vois quels combos enregistrés sont jouables avec elle.",
+    ),
+    ("handtest.deck", "Deck :"),
+    ("handtest.main_deck_count", "Main Deck : {0} cartes"),
+    (
+        "handtest.deck_empty",
+        "Ce deck n'a aucune carte dans le Main Deck. Ajoute d'abord des cartes dans « Decks ».",
+    ),
+    ("handtest.hand_size", "Taille de la main :"),
+    ("handtest.draw", "Piocher la main"),
+    ("handtest.simulate", "Simuler {0} mains"),
+    (
+        "handtest.simulate_hint",
+        "Pioche beaucoup de mains aléatoires et compte combien de fois chaque combo est jouable.",
+    ),
+    (
+        "handtest.no_hand",
+        "Aucune main piochée. Clique sur « Piocher la main ».",
+    ),
+    ("handtest.hand", "Ta main"),
+    ("handtest.playable", "Combos jouables"),
+    (
+        "handtest.none_playable",
+        "Aucun combo enregistré n'est jouable avec cette main.",
+    ),
+    ("handtest.open", "Ouvrir"),
+    ("handtest.linked", "(lié à ce deck)"),
+    (
+        "handtest.stats_title",
+        "Statistiques : {0} mains de {1} cartes chacune",
+    ),
+    (
+        "handtest.stats_no_combos",
+        "Aucun combo n'a de main de départ. Ajoute d'abord une main de départ à un combo.",
+    ),
+    ("handtest.stats_percent", "{0} %"),
+    ("handtest.stats_any", "Au moins un combo jouable : {0} %"),
 ];

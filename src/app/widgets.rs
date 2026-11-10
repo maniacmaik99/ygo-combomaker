@@ -73,6 +73,31 @@ pub fn kind_of(db: &CardDb, slot: &Slot) -> CardKind {
     }
 }
 
+/// Eigenschaften der Karte für das Aktionsmenü.
+pub fn traits_of(db: &CardDb, slot: &Slot) -> crate::board::CardTraits {
+    let mut t = crate::board::CardTraits {
+        kind: kind_of(db, slot),
+        ..Default::default()
+    };
+    if let Some(c) = slot.card_id().and_then(|id| db.get(id)) {
+        let ty = &c.type_line;
+        t.pendulum = ty.contains("Pendulum");
+        t.ritual = ty.contains("Ritual");
+        t.extra_summon = if ty.contains("Fusion") {
+            Some(Action::FusionSummon)
+        } else if ty.contains("Synchro") {
+            Some(Action::SynchroSummon)
+        } else if ty.contains("XYZ") {
+            Some(Action::XyzSummon)
+        } else if ty.contains("Link") {
+            Some(Action::LinkSummon)
+        } else {
+            None
+        };
+    }
+    t
+}
+
 pub fn is_extra(db: &CardDb, slot: &Slot) -> bool {
     slot.card_id()
         .and_then(|id| db.get(id))
@@ -113,8 +138,23 @@ pub fn card_widget(
     width: f32,
     highlight: Option<Color32>,
 ) -> egui::Response {
+    card_widget_sense(ui, images, v, slot, marks, width, highlight, Sense::click())
+}
+
+/// Wie [`card_widget`], aber mit wählbarer Eingabe-Art (z. B. Ziehen).
+#[allow(clippy::too_many_arguments)]
+pub fn card_widget_sense(
+    ui: &mut egui::Ui,
+    images: &mut ImageCache,
+    v: View,
+    slot: &Slot,
+    marks: Marks,
+    width: f32,
+    highlight: Option<Color32>,
+    sense: Sense,
+) -> egui::Response {
     let size = Vec2::new(width, width * CARD_RATIO);
-    let (rect, resp) = ui.allocate_exact_size(size, Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(size, sense);
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
         let small = FontId::proportional((width / 6.0).clamp(9.0, 14.0));

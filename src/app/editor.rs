@@ -32,8 +32,14 @@ impl ComboApp {
         }
 
         egui::ScrollArea::vertical().show(ui, |ui| {
-            self.meta_ui(ui, idx);
-            ui.add_space(6.0);
+            // Kopfdaten einklappbar, damit das Spielfeld ohne Scrollen sichtbar ist.
+            // Bei einer neuen Combo (noch ohne Schritte) sind sie aufgeklappt.
+            let fresh = self.combos[idx].steps.is_empty();
+            egui::CollapsingHeader::new(RichText::new(tr("editor.meta")).strong())
+                .id_salt(("meta", self.combos[idx].id))
+                .default_open(fresh || self.edit_mode == EditMode::List)
+                .show(ui, |ui| self.meta_ui(ui, idx));
+            ui.add_space(2.0);
             ui.horizontal(|ui| {
                 ui.label(RichText::new(tr("editor.mode")).strong());
                 ui.selectable_value(
@@ -174,6 +180,11 @@ impl ComboApp {
             combo_id: self.combos[idx].id,
             board: self.rebuild_board(idx),
             field: FieldUi::default(),
+            hand: self.combos[idx]
+                .starting_hand
+                .iter()
+                .map(|e| e.slot.clone())
+                .collect(),
         });
     }
 
@@ -186,18 +197,15 @@ impl ComboApp {
         {
             self.recorder = None;
         }
-        ui.heading(tr("rec.title"));
-        if self.recorder.is_none() {
-            ui.label(tr("rec.intro"));
-            let label = if self.combos[idx].steps.is_empty() {
-                tr("rec.start")
-            } else {
-                tr("rec.continue")
-            };
-            if ui.button(RichText::new(label).strong()).clicked() {
-                self.start_recording(idx);
-            }
-            return;
+        // Die Aufnahme läuft immer. Ändert sich die Starthand, wird das
+        // Feld neu aufgebaut.
+        let hand: Vec<Slot> = self.combos[idx]
+            .starting_hand
+            .iter()
+            .map(|e| e.slot.clone())
+            .collect();
+        if self.recorder.as_ref().is_none_or(|r| r.hand != hand) {
+            self.start_recording(idx);
         }
 
         // Werkzeugleiste
@@ -205,7 +213,12 @@ impl ComboApp {
         let mut undo = false;
         let mut take_endboard = false;
         let mut rebuild = false;
-        let mut stop = false;
+        // Strg+Z macht den letzten Zug rückgängig (nicht während der Texteingabe).
+        if !ui.ctx().egui_wants_keyboard_input()
+            && ui.input(|i| i.modifiers.command && i.key_pressed(egui::Key::Z))
+        {
+            undo = self.combos[idx].steps.iter().any(|s| !s.parts.is_empty());
+        }
         ui.horizontal_wrapped(|ui| {
             let steps = &self.combos[idx].steps;
             let current = steps.len().max(1);
@@ -218,11 +231,12 @@ impl ComboApp {
                 .button(tr("rec.new_step"))
                 .on_hover_text(tr("rec.new_step_hint"))
                 .clicked();
-            undo = ui
+            undo |= ui
                 .add_enabled(
                     steps.iter().any(|s| !s.parts.is_empty()),
                     egui::Button::new(tr("rec.undo")),
                 )
+                .on_hover_text(tr("rec.undo_hint"))
                 .clicked();
             take_endboard = ui
                 .button(tr("rec.take_endboard"))
@@ -232,7 +246,6 @@ impl ComboApp {
                 .button(tr("rec.rebuild"))
                 .on_hover_text(tr("rec.rebuild_hint"))
                 .clicked();
-            stop = ui.button(tr("rec.stop")).clicked();
         });
 
         // Notiz zum letzten Zug
@@ -265,7 +278,14 @@ impl ComboApp {
             name_lang: self.name_lang(),
         };
         let rec = self.recorder.as_mut().expect("recorder");
-        let event = rec.field.show(ui, &rec.board, &mut self.images, v, width);
+        let event = rec.field.show(
+            ui,
+            &rec.board,
+            &mut self.images,
+            v,
+            width,
+            self.settings.auto_zone,
+        );
 
         match event {
             Some(FieldEvent::Pick(area)) => self.open_picker(Target::RecordFrom(area)),
@@ -323,9 +343,6 @@ impl ComboApp {
                 rec.board = b;
                 rec.field.reset();
             }
-        }
-        if stop {
-            self.recorder = None;
         }
     }
 
@@ -392,7 +409,7 @@ impl ComboApp {
                 self.mark_dirty();
             }
             if section == Section::StartingHand && self.recorder.is_some() {
-                ui.label(RichText::new(tr("editor.hand_changed_hint")).weak());
+                ui.label(RichText::new(tr("editor.hand_click_hint")).weak());
             }
         });
         let width = self.settings.card_width;
@@ -413,9 +430,14 @@ impl ComboApp {
                 open_picker = true;
             }
         });
-        if let Some(i) = clicked {
+        if let Some(i) = clicked
+            && self.edit_mode == EditMode::Field
+        {
+            // Im Spielfeld-Modus entfernt ein Klick die Karte aus der Starthand.
+            section.entries_mut(&mut self.combos[idx]).remove(i);
+            self.mark_dirty();
+        } else if let Some(i) = clicked {
             self.selection = Some(Sel::Section(section, i));
-            self.edit_mode = EditMode::List;
         }
         if open_picker {
             self.open_picker(Target::Section(section));

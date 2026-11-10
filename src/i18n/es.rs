@@ -593,4 +593,81 @@ pub const T: &[(&str, &str)] = &[
     ("badge.negate", "Negar"),
     ("badge.target", "Objetivo"),
     ("badge.change_position", "Pos"),
+    (
+        "field.status_idle",
+        "Haz clic en una carta para ver sus acciones, o arrástrala a una zona. Esc o clic derecho cancela.",
+    ),
+    ("field.more_actions", "Más acciones …"),
+    ("field.deck_hint", "Clic: elegir una carta de aquí."),
+    ("cell.deck", "Deck"),
+    ("practice.hint", "Pista"),
+    (
+        "practice.hint_hint",
+        "Marca en verde la carta de la siguiente jugada. La jugada ya no cuenta como correcta al primer intento.",
+    ),
+    ("practice.hint_text", "Pista: la siguiente jugada usa {0}."),
+    (
+        "editor.meta",
+        "Datos del combo (título, deck, notas, compartir)",
+    ),
+    (
+        "editor.hand_click_hint",
+        "Haz clic en una carta para quitarla. El campo de abajo se reconstruye automáticamente.",
+    ),
+    ("rec.undo_hint", "Atajo: Ctrl+Z"),
+    ("settings.auto_zone", "Board: choose the zone automatically"),
+    (
+        "settings.auto_zone_hint",
+        "On: a summoned or placed card goes to the first free zone. Off: you click the zone.",
+    ),
+    // Hand test, combo filter
+    ("view.hand_test", "Prueba de mano"),
+    ("combo.filter_hint", "Buscar combos …"),
+    (
+        "combo.filter_no_match",
+        "Ningún combo coincide con la búsqueda.",
+    ),
+    (
+        "handtest.no_decks",
+        "Todavía no tienes ningún Deck. Crea primero un Deck en «Decks».",
+    ),
+    (
+        "handtest.intro",
+        "Roba una mano inicial aleatoria del Deck Principal. Debajo de la mano ves qué combos guardados se pueden jugar con ella.",
+    ),
+    ("handtest.deck", "Deck:"),
+    ("handtest.main_deck_count", "Deck Principal: {0} cartas"),
+    (
+        "handtest.deck_empty",
+        "Este Deck no tiene cartas en el Deck Principal. Añade primero cartas en «Decks».",
+    ),
+    ("handtest.hand_size", "Tamaño de la mano:"),
+    ("handtest.draw", "Robar mano"),
+    ("handtest.simulate", "Simular {0} manos"),
+    (
+        "handtest.simulate_hint",
+        "Roba muchas manos aleatorias y cuenta cuántas veces se puede jugar cada combo.",
+    ),
+    (
+        "handtest.no_hand",
+        "Todavía no has robado ninguna mano. Haz clic en «Robar mano».",
+    ),
+    ("handtest.hand", "Tu mano"),
+    ("handtest.playable", "Combos jugables"),
+    (
+        "handtest.none_playable",
+        "Ningún combo guardado se puede jugar con esta mano.",
+    ),
+    ("handtest.open", "Abrir"),
+    ("handtest.linked", "(vinculado a este Deck)"),
+    (
+        "handtest.stats_title",
+        "Estadísticas: {0} manos de {1} cartas cada una",
+    ),
+    (
+        "handtest.stats_no_combos",
+        "Ningún combo tiene mano inicial. Añade primero una mano inicial a un combo.",
+    ),
+    ("handtest.stats_percent", "{0} %"),
+    ("handtest.stats_any", "Al menos un combo jugable: {0} %"),
 ];

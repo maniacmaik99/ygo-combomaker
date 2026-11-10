@@ -581,4 +581,84 @@ pub const T: &[(&str, &str)] = &[
     ("badge.negate", "Annul"),
     ("badge.target", "Bersag"),
     ("badge.change_position", "Pos"),
+    (
+        "field.status_idle",
+        "Clicca una carta per vedere le sue azioni, oppure trascinala su una zona. Esc o clic destro annulla.",
+    ),
+    ("field.more_actions", "Altre azioni …"),
+    ("field.deck_hint", "Clic: scegli una carta da qui."),
+    ("cell.deck", "Deck"),
+    ("practice.hint", "Suggerimento"),
+    (
+        "practice.hint_hint",
+        "Segna in verde la carta della prossima mossa. La mossa non conta più come corretta al primo tentativo.",
+    ),
+    (
+        "practice.hint_text",
+        "Suggerimento: la prossima mossa usa {0}.",
+    ),
+    (
+        "editor.meta",
+        "Dettagli della combo (titolo, deck, note, condivisione)",
+    ),
+    (
+        "editor.hand_click_hint",
+        "Clicca una carta per rimuoverla. Il terreno sotto viene ricostruito automaticamente.",
+    ),
+    ("rec.undo_hint", "Scorciatoia: Ctrl+Z"),
+    ("settings.auto_zone", "Board: choose the zone automatically"),
+    (
+        "settings.auto_zone_hint",
+        "On: a summoned or placed card goes to the first free zone. Off: you click the zone.",
+    ),
+    // Hand test, combo filter
+    ("view.hand_test", "Test della mano"),
+    ("combo.filter_hint", "Cerca combo …"),
+    (
+        "combo.filter_no_match",
+        "Nessuna combo corrisponde alla ricerca.",
+    ),
+    (
+        "handtest.no_decks",
+        "Non hai ancora un Deck. Crea prima un Deck in «Deck».",
+    ),
+    (
+        "handtest.intro",
+        "Pesca una mano iniziale casuale dal Main Deck. Sotto la mano vedi quali combo salvate sono giocabili con essa.",
+    ),
+    ("handtest.deck", "Deck:"),
+    ("handtest.main_deck_count", "Main Deck: {0} carte"),
+    (
+        "handtest.deck_empty",
+        "Questo Deck non ha carte nel Main Deck. Aggiungi prima delle carte in «Deck».",
+    ),
+    ("handtest.hand_size", "Dimensione della mano:"),
+    ("handtest.draw", "Pesca la mano"),
+    ("handtest.simulate", "Simula {0} mani"),
+    (
+        "handtest.simulate_hint",
+        "Pesca molte mani casuali e conta quante volte ogni combo è giocabile.",
+    ),
+    (
+        "handtest.no_hand",
+        "Nessuna mano pescata. Clicca su «Pesca la mano».",
+    ),
+    ("handtest.hand", "La tua mano"),
+    ("handtest.playable", "Combo giocabili"),
+    (
+        "handtest.none_playable",
+        "Nessuna combo salvata è giocabile con questa mano.",
+    ),
+    ("handtest.open", "Apri"),
+    ("handtest.linked", "(collegata a questo Deck)"),
+    (
+        "handtest.stats_title",
+        "Statistiche: {0} mani da {1} carte ciascuna",
+    ),
+    (
+        "handtest.stats_no_combos",
+        "Nessuna combo ha una mano iniziale. Aggiungi prima una mano iniziale a una combo.",
+    ),
+    ("handtest.stats_percent", "{0} %"),
+    ("handtest.stats_any", "Almeno una combo giocabile: {0} %"),
 ];

@@ -1,28 +1,43 @@
 //! Spielfeld-Oberfläche. Wird zum Aufnehmen (Editor) und zum Üben benutzt.
+//! Die Bedienung orientiert sich an digitalen Kartenspielen:
 //!
-//! Ablauf eines Zugs:
-//! 1. Karte anklicken (Hand, Feld, Stapel) oder aus Deck/Extra Deck holen.
-//! 2. Aktion in der Aktionsleiste wählen.
-//! 3. Falls nötig: Zielzone auf dem Feld anklicken (bzw. Hand/Friedhof).
+//! - Karte anklicken: Direkt an der Karte erscheint ein Menü mit den
+//!   Aktionen, die an diesem Ort üblich sind.
+//! - Karte ziehen: Karte mit gedrückter Maustaste auf eine Zone, den
+//!   Friedhof, den Verbannt-Stapel oder die Hand ziehen. Passt nur eine
+//!   Aktion, wird sie sofort ausgeführt, sonst erscheint ein kurzes Menü.
+//! - Deck und Extra Deck sind Stapel auf dem Feld. Ein Klick öffnet die
+//!   Kartenauswahl.
+//! - Esc oder Rechtsklick bricht ab.
 
-use egui::{Align2, Color32, FontId, RichText, Sense, Stroke, StrokeKind, Vec2};
+use egui::{Align2, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Vec2};
 
 use super::widgets::{
-    CARD_RATIO, Marks, SELECT_COLOR, TARGET_COLOR, View, card_widget, kind_of, shown_name,
+    CARD_RATIO, GOOD_COLOR, Marks, SELECT_COLOR, TARGET_COLOR, View, card_widget_sense, is_extra,
+    shown_name, traits_of,
 };
-use crate::board::{Area, Board, Dest, FieldCard, Move, dest_for};
+use crate::board::{Area, Board, Dest, FieldCard, Move, action_reaches, context_actions, dest_for};
 use crate::i18n::{tr, trf};
 use crate::images::ImageCache;
-use crate::model::{Action, Slot};
+use crate::model::{Action, Slot, Zone};
 
 #[derive(Clone, Debug, Default)]
 pub enum Pending {
     #[default]
     None,
+    /// Karte gewählt, Menü ist offen.
     Card {
         slot: Slot,
         from: Area,
+        /// Position des Menüs.
+        pos: Pos2,
+        /// Zielzone steht schon fest (Karte wurde dorthin gezogen).
+        to: Option<Area>,
+        /// Nur diese Aktionen anbieten (nach dem Ziehen).
+        only: Option<Vec<Action>>,
+        show_all: bool,
     },
+    /// Aktion gewählt, Zielzone fehlt noch.
     Zone {
         slot: Slot,
         from: Area,
@@ -38,6 +53,16 @@ pub struct FieldUi {
     pub chain_no: u8,
     /// Welcher Stapel aufgeklappt ist.
     pub open_pile: Option<Area>,
+    /// Tipp im Übungsmodus: Diese Karte wird grün markiert.
+    pub hint: Option<Slot>,
+    /// Karte, die gerade mit der Maus gezogen wird.
+    drag: Option<(Slot, Area)>,
+    /// Zone unter dem Mauszeiger während des Ziehens.
+    hover: Option<Area>,
+    /// Das Menü wurde in diesem Frame geöffnet (Klick nicht als „daneben“ werten).
+    menu_fresh: bool,
+    deck_rect: Option<Rect>,
+    extra_rect: Option<Rect>,
 }
 
 /// Was die Spielfeld-Oberfläche in diesem Frame ausgelöst hat.
@@ -75,37 +100,49 @@ fn short_label(a: Area) -> &'static str {
         Area::Banished => tr("cell.banished"),
         Area::Overlay => tr("cell.overlay"),
         Area::ExtraDeck => tr("cell.extra"),
-        _ => "",
+        Area::Deck => tr("cell.deck"),
+        Area::Hand => "",
     }
 }
 
-/// Leeres Feld mit Umriss und Beschriftung.
+/// Leeres Feld mit Umriss und Beschriftung. `solid` zeichnet einen
+/// Kartenrücken (für Deck und Extra Deck).
 fn empty_cell(
     ui: &mut egui::Ui,
     w: f32,
     label: &str,
     highlight: Option<Color32>,
+    solid: bool,
 ) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(Vec2::new(w, w * CARD_RATIO), Sense::click());
     let p = ui.painter();
-    let fill = if resp.hovered() {
-        Color32::from_white_alpha(14)
-    } else {
-        Color32::from_white_alpha(6)
+    let fill = match (solid, resp.hovered()) {
+        (true, true) => Color32::from_rgb(86, 62, 150),
+        (true, false) => Color32::from_rgb(66, 48, 120),
+        (false, true) => Color32::from_white_alpha(14),
+        (false, false) => Color32::from_white_alpha(6),
     };
     p.rect(
         rect,
         6.0,
         fill,
-        Stroke::new(1.0, Color32::from_white_alpha(40)),
+        Stroke::new(1.0, Color32::from_white_alpha(if solid { 110 } else { 40 })),
         StrokeKind::Inside,
     );
+    if solid {
+        p.rect_stroke(
+            rect.shrink(5.0),
+            4.0,
+            Stroke::new(1.0, Color32::from_white_alpha(60)),
+            StrokeKind::Inside,
+        );
+    }
     p.text(
         rect.center(),
         Align2::CENTER_CENTER,
         label,
         FontId::proportional((w / 6.0).clamp(9.0, 13.0)),
-        Color32::from_white_alpha(90),
+        Color32::from_white_alpha(if solid { 230 } else { 90 }),
     );
     if let Some(c) = highlight {
         p.rect_stroke(rect, 6.0, Stroke::new(2.5, c), StrokeKind::Outside);
@@ -113,23 +150,60 @@ fn empty_cell(
     resp
 }
 
+/// Gemeinsame Daten eines Frames.
+struct Cx<'a, 'b> {
+    board: &'a Board,
+    images: &'a mut ImageCache,
+    v: View<'b>,
+    w: f32,
+    auto_zone: bool,
+    event: Option<FieldEvent>,
+    hint_area: Option<Area>,
+}
+
 impl FieldUi {
     pub fn reset(&mut self) {
         self.pending = Pending::None;
         self.open_pile = None;
+        self.drag = None;
+        self.hint = None;
     }
 
+    /// Wählt eine Karte, die aus der Kartenauswahl kommt (Deck/Extra Deck).
     pub fn select(&mut self, slot: Slot, from: Area) {
-        self.pending = Pending::Card { slot, from };
+        let rect = if from == Area::ExtraDeck {
+            self.extra_rect
+        } else {
+            self.deck_rect
+        };
+        let pos = rect
+            .map(|r| r.right_top() + Vec2::new(6.0, 0.0))
+            .unwrap_or(Pos2::new(320.0, 320.0));
+        self.select_at(slot, from, pos);
+    }
+
+    fn select_at(&mut self, slot: Slot, from: Area, pos: Pos2) {
+        self.pending = Pending::Card {
+            slot,
+            from,
+            pos,
+            to: None,
+            only: None,
+            show_all: false,
+        };
+        self.menu_fresh = true;
     }
 
     fn selected(&self) -> Option<(&Slot, Area)> {
         match &self.pending {
-            Pending::Card { slot, from } | Pending::Zone { slot, from, .. } => Some((slot, *from)),
-            Pending::None => None,
+            Pending::Card { slot, from, .. } | Pending::Zone { slot, from, .. } => {
+                Some((slot, *from))
+            }
+            Pending::None => self.drag.as_ref().map(|(s, a)| (s, *a)),
         }
     }
 
+    /// Zielart, für die gerade Zonen markiert werden.
     fn target_dest(&self) -> Option<Dest> {
         match &self.pending {
             Pending::Zone { dest, .. } => Some(*dest),
@@ -137,7 +211,7 @@ impl FieldUi {
         }
     }
 
-    /// Zeichnet Spielfeld und Aktionsleiste. `width` = Kartenbreite.
+    /// Zeichnet das Spielfeld. `width` = Kartenbreite.
     pub fn show(
         &mut self,
         ui: &mut egui::Ui,
@@ -145,97 +219,142 @@ impl FieldUi {
         images: &mut ImageCache,
         v: View,
         width: f32,
+        auto_zone: bool,
     ) -> Option<FieldEvent> {
-        let mut event = None;
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                if let Some(e) = self.board_ui(ui, board, images, v, width) {
-                    event = Some(e);
-                }
-            });
-            ui.add_space(8.0);
-            ui.vertical(|ui| {
-                ui.set_width(270.0);
-                if let Some(e) = self.action_panel(ui, images, v) {
-                    event = Some(e);
-                }
-            });
-        });
-        if let Some(FieldEvent::Move(_)) = &event {
+        let ctx = ui.ctx().clone();
+        // Abbrechen mit Esc oder Rechtsklick.
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape) || i.pointer.secondary_clicked()) {
             self.pending = Pending::None;
+            self.drag = None;
+        }
+        self.hover = None;
+        let hint_area = self.hint.as_ref().map(|s| {
+            board.find(s).unwrap_or(if is_extra(v.db, s) {
+                Area::ExtraDeck
+            } else {
+                Area::Deck
+            })
+        });
+        let mut cx = Cx {
+            board,
+            images,
+            v,
+            w: width,
+            auto_zone,
+            event: None,
+            hint_area,
+        };
+
+        self.status_line(ui);
+        self.board_ui(ui, &mut cx);
+        self.menu(&ctx, &mut cx);
+        self.drag_and_drop(&ctx, &mut cx);
+
+        self.menu_fresh = false;
+        let event = cx.event;
+        if let Some(FieldEvent::Move(mv)) = &event {
+            if let Action::Chain(n) = mv.action {
+                // Das nächste Kettenglied hat die nächste Nummer.
+                self.chain_no = n.saturating_add(1);
+            }
+            self.pending = Pending::None;
+            self.hint = None;
         }
         event
     }
 
-    fn board_ui(
-        &mut self,
-        ui: &mut egui::Ui,
-        board: &Board,
-        images: &mut ImageCache,
-        v: View,
-        w: f32,
-    ) -> Option<FieldEvent> {
-        let mut event = None;
-        let gap = ui.spacing().item_spacing.x;
-        let selected_from = self.selected().map(|(_, a)| a);
-        let dest = self.target_dest();
+    fn status_line(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| match &self.pending {
+            Pending::Zone {
+                slot: _, action, ..
+            } => {
+                ui.label(
+                    RichText::new(format!("{}: {}", action.label(), tr("field.choose_zone")))
+                        .color(TARGET_COLOR)
+                        .strong(),
+                );
+                if ui.small_button(tr("common.cancel")).clicked() {
+                    self.pending = Pending::None;
+                }
+            }
+            _ => {
+                ui.label(RichText::new(tr("field.status_idle")).weak());
+            }
+        });
+    }
 
-        // Reihe 1: Extra-Monsterzonen über Monsterzone 2 und 4, rechts: Verbannt.
+    fn board_ui(&mut self, ui: &mut egui::Ui, cx: &mut Cx) {
+        let w = cx.w;
+        let gap = ui.spacing().item_spacing.x;
+        let board = cx.board;
+
+        // Reihe 1: Xyz-Material, Extra-Monsterzonen, Verbannt.
         ui.horizontal(|ui| {
-            ui.add_space(2.0 * (w + gap));
-            if let Some(e) = self.zone_cell(ui, board, images, v, w, Area::Emz(0)) {
-                event = Some(e);
-            }
+            self.pile(ui, cx, Area::Overlay, &board.overlay);
             ui.add_space(w + gap);
-            if let Some(e) = self.zone_cell(ui, board, images, v, w, Area::Emz(1)) {
-                event = Some(e);
-            }
-            ui.add_space(2.0 * (w + gap));
-            if let Some(e) = self.pile(ui, board, images, v, w, Area::Banished, &board.banished) {
-                event = Some(e);
-            }
+            self.zone_cell(ui, cx, Area::Emz(0));
+            ui.add_space(w + gap);
+            self.zone_cell(ui, cx, Area::Emz(1));
+            ui.add_space(w + gap);
+            self.pile(ui, cx, Area::Banished, &board.banished);
         });
-        // Reihe 2: Feldzauber, 5 Monsterzonen, Friedhof, Xyz-Material.
+        // Reihe 2: Feldzauber, 5 Monsterzonen, Friedhof.
         ui.horizontal(|ui| {
-            if let Some(e) = self.zone_cell(ui, board, images, v, w, Area::Field) {
-                event = Some(e);
-            }
+            self.zone_cell(ui, cx, Area::Field);
             for i in 0..5 {
-                if let Some(e) = self.zone_cell(ui, board, images, v, w, Area::Monster(i)) {
-                    event = Some(e);
-                }
+                self.zone_cell(ui, cx, Area::Monster(i));
             }
-            if let Some(e) = self.pile(ui, board, images, v, w, Area::Gy, &board.gy) {
-                event = Some(e);
-            }
-            if let Some(e) = self.pile(ui, board, images, v, w, Area::Overlay, &board.overlay) {
-                event = Some(e);
-            }
+            self.pile(ui, cx, Area::Gy, &board.gy);
         });
-        // Reihe 3: Pendel links, 5 Zauber/Fallen, Pendel rechts, Extra Deck (offen).
+        // Reihe 3: Pendel links, 5 Zauber/Fallen, Pendel rechts.
         ui.horizontal(|ui| {
-            if let Some(e) = self.zone_cell(ui, board, images, v, w, Area::PendulumLeft) {
-                event = Some(e);
-            }
+            self.zone_cell(ui, cx, Area::PendulumLeft);
             for i in 0..5 {
-                if let Some(e) = self.zone_cell(ui, board, images, v, w, Area::SpellTrap(i)) {
-                    event = Some(e);
-                }
+                self.zone_cell(ui, cx, Area::SpellTrap(i));
             }
-            if let Some(e) = self.zone_cell(ui, board, images, v, w, Area::PendulumRight) {
-                event = Some(e);
+            self.zone_cell(ui, cx, Area::PendulumRight);
+        });
+        ui.add_space(4.0);
+        // Reihe 4: Extra Deck, Hand, Deck.
+        ui.horizontal_top(|ui| {
+            self.deck_pile(ui, cx, Area::ExtraDeck);
+            let hand_w = 5.0 * (w + gap) - gap;
+            let inner = ui.allocate_ui_with_layout(
+                Vec2::new(hand_w, w * CARD_RATIO),
+                egui::Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
+                |ui| {
+                    ui.set_min_size(Vec2::new(hand_w, w * CARD_RATIO));
+                    for c in &board.hand {
+                        self.card(ui, cx, c, Area::Hand, w, Marks::default());
+                    }
+                },
+            );
+            let rect = inner.response.rect;
+            let droppable = self
+                .drag
+                .as_ref()
+                .is_some_and(|(_, from)| *from != Area::Hand);
+            let over = droppable && ui.rect_contains_pointer(rect);
+            if over {
+                self.hover = Some(Area::Hand);
             }
-            if let Some(e) = self.pile(
-                ui,
-                board,
-                images,
-                v,
-                w,
-                Area::ExtraDeck,
-                &board.extra_face_up,
-            ) {
-                event = Some(e);
+            let stroke = if over {
+                Stroke::new(2.5, TARGET_COLOR)
+            } else {
+                Stroke::new(1.0, Color32::from_white_alpha(25))
+            };
+            ui.painter()
+                .rect_stroke(rect.expand(3.0), 6.0, stroke, StrokeKind::Outside);
+            if board.hand.is_empty() {
+                ui.painter().text(
+                    rect.center(),
+                    Align2::CENTER_CENTER,
+                    tr("area.hand"),
+                    FontId::proportional(13.0),
+                    Color32::from_white_alpha(90),
+                );
             }
+            self.deck_pile(ui, cx, Area::Deck);
         });
 
         // Aufgeklappter Stapel
@@ -249,96 +368,121 @@ impl FieldUi {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 ui.label(RichText::new(area_label(area)).strong());
+                if area == Area::ExtraDeck && ui.small_button(tr("field.from_extra")).clicked() {
+                    cx.event = Some(FieldEvent::Pick(Area::ExtraDeck));
+                }
                 if ui.small_button(tr("field.close_pile")).clicked() {
                     self.open_pile = None;
                 }
             });
             ui.horizontal_wrapped(|ui| {
                 for c in cards.iter() {
-                    if card_widget(ui, images, v, &c.slot, Marks::default(), w * 0.8, None)
-                        .clicked()
-                    {
-                        self.select(c.slot.clone(), area);
-                    }
+                    self.card(ui, cx, c, area, w * 0.8, Marks::default());
                 }
                 if cards.is_empty() {
                     ui.label(RichText::new(tr("field.pile_empty")).weak());
                 }
             });
         }
-
-        // Hand
-        ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(tr("area.hand")).strong());
-            let hand_target = dest == Some(Dest::ChooseHandOrGy);
-            if hand_target && ui.button(tr("field.to_hand")).clicked() {
-                event = self.finish_zone(Area::Hand);
-            }
-            if hand_target && ui.button(tr("field.to_gy")).clicked() {
-                event = self.finish_zone(Area::Gy);
-            }
-        });
-        ui.horizontal_wrapped(|ui| {
-            for c in &board.hand {
-                let hl = (selected_from == Some(Area::Hand)
-                    && self.selected().is_some_and(|(s, _)| s == &c.slot))
-                .then_some(SELECT_COLOR);
-                if card_widget(ui, images, v, &c.slot, Marks::default(), w, hl).clicked() {
-                    self.select(c.slot.clone(), Area::Hand);
-                }
-            }
-            if board.hand.is_empty() {
-                ui.label(RichText::new(tr("field.hand_empty")).weak());
-            }
-        });
-        ui.horizontal(|ui| {
-            if ui
-                .button(tr("field.from_deck"))
-                .on_hover_text(tr("field.from_deck_hint"))
-                .clicked()
-            {
-                event = Some(FieldEvent::Pick(Area::Deck));
-            }
-            if ui.button(tr("field.from_extra")).clicked() {
-                event = Some(FieldEvent::Pick(Area::ExtraDeck));
-            }
-        });
-        event
     }
 
-    /// Eine Zone des Felds zeichnen und Klicks auswerten.
-    fn zone_cell(
+    /// Zeichnet eine Karte, die man anklicken und ziehen kann.
+    fn card(
         &mut self,
         ui: &mut egui::Ui,
-        board: &Board,
-        images: &mut ImageCache,
-        v: View,
-        w: f32,
+        cx: &mut Cx,
+        c: &FieldCard,
         area: Area,
-    ) -> Option<FieldEvent> {
-        let card = board.zone(area);
-        let dest = self.target_dest();
-        let is_target = dest.is_some_and(|d| d.accepts(area)) && card.is_none();
-        let hl = if self.selected().map(|(_, a)| a) == Some(area) {
+        w: f32,
+        marks: Marks,
+    ) -> egui::Response {
+        let is_selected = self
+            .selected()
+            .is_some_and(|(s, a)| a == area && s == &c.slot);
+        let is_hint = cx.hint_area == Some(area) && self.hint.as_ref() == Some(&c.slot);
+        let hl = if is_selected {
             Some(SELECT_COLOR)
-        } else if is_target {
-            Some(TARGET_COLOR)
+        } else if is_hint {
+            Some(GOOD_COLOR)
         } else {
             None
         };
-        let resp = match card {
-            Some(c) => card_widget(ui, images, v, &c.slot, Marks::face_down(c.face_down), w, hl),
-            None => empty_cell(ui, w, short_label(area), hl),
-        };
-        if resp.clicked() {
-            if is_target {
-                return self.finish_zone(area);
-            } else if let Some(c) = card {
-                self.select(c.slot.clone(), area);
-            }
+        let resp = card_widget_sense(
+            ui,
+            cx.images,
+            cx.v,
+            &c.slot,
+            marks,
+            w,
+            hl,
+            Sense::click_and_drag(),
+        );
+        if resp.drag_started() {
+            self.drag = Some((c.slot.clone(), area));
+            self.pending = Pending::None;
         }
-        None
+        // Während auf eine Zielzone gewartet wird, wählt ein Klick keine neue Karte.
+        if resp.clicked() && self.target_dest().is_none() {
+            self.select_at(
+                c.slot.clone(),
+                area,
+                resp.rect.right_top() + Vec2::new(6.0, 0.0),
+            );
+        }
+        resp
+    }
+
+    /// Eine Zone des Felds zeichnen und Klicks auswerten.
+    fn zone_cell(&mut self, ui: &mut egui::Ui, cx: &mut Cx, area: Area) {
+        let card = cx.board.zone(area);
+        let is_target = card.is_none() && self.target_dest().is_some_and(|d| d.accepts(area));
+        let resp = match card {
+            Some(c) => {
+                let c = c.clone();
+                self.card(ui, cx, &c, area, cx.w, Marks::face_down(c.face_down))
+            }
+            None => empty_cell(
+                ui,
+                cx.w,
+                short_label(area),
+                is_target.then_some(TARGET_COLOR),
+                false,
+            ),
+        };
+        self.drop_target(ui, cx, area, resp.rect, card.is_none());
+        if resp.clicked() && is_target {
+            cx.event = self.finish_zone(area);
+        }
+    }
+
+    /// Merkt sich die Zone unter dem Mauszeiger, wenn die gezogene Karte
+    /// mit irgendeiner üblichen Aktion dorthin kann, und markiert sie.
+    fn drop_target(&mut self, ui: &mut egui::Ui, cx: &mut Cx, area: Area, rect: Rect, free: bool) {
+        let Some((slot, from)) = &self.drag else {
+            return;
+        };
+        if *from == area || !free {
+            return;
+        }
+        let t = traits_of(cx.v.db, slot);
+        let possible = Action::GROUPS
+            .iter()
+            .flat_map(|g| g.actions)
+            .any(|a| action_reaches(*a, t.kind, *from, area));
+        if !possible {
+            return;
+        }
+        let over = ui.rect_contains_pointer(rect);
+        let color = if over {
+            TARGET_COLOR
+        } else {
+            TARGET_COLOR.gamma_multiply(0.35)
+        };
+        ui.painter()
+            .rect_stroke(rect, 6.0, Stroke::new(2.5, color), StrokeKind::Outside);
+        if over {
+            self.hover = Some(area);
+        }
     }
 
     fn finish_zone(&mut self, area: Area) -> Option<FieldEvent> {
@@ -356,22 +500,27 @@ impl FieldUi {
         None
     }
 
-    /// Stapel (Friedhof, Verbannt, …): oberste Karte und Anzahl.
-    #[allow(clippy::too_many_arguments)]
-    fn pile(
-        &mut self,
-        ui: &mut egui::Ui,
-        _board: &Board,
-        images: &mut ImageCache,
-        v: View,
-        w: f32,
-        area: Area,
-        cards: &[FieldCard],
-    ) -> Option<FieldEvent> {
-        let hl = (self.open_pile == Some(area)).then_some(SELECT_COLOR);
+    /// Stapel (Friedhof, Verbannt, Xyz-Material): oberste Karte und Anzahl.
+    /// Ein Klick klappt den Stapel auf.
+    fn pile(&mut self, ui: &mut egui::Ui, cx: &mut Cx, area: Area, cards: &[FieldCard]) {
+        let hl = if self.open_pile == Some(area) {
+            Some(SELECT_COLOR)
+        } else if cx.hint_area == Some(area) {
+            Some(GOOD_COLOR)
+        } else {
+            None
+        };
         let resp = match cards.last() {
-            Some(c) => card_widget(ui, images, v, &c.slot, Marks::default(), w, hl),
-            None => empty_cell(ui, w, short_label(area), hl),
+            Some(c) => super::widgets::card_widget(
+                ui,
+                cx.images,
+                cx.v,
+                &c.slot,
+                Marks::default(),
+                cx.w,
+                hl,
+            ),
+            None => empty_cell(ui, cx.w, short_label(area), hl, false),
         };
         if !cards.is_empty() {
             super::widgets::pill(
@@ -383,6 +532,7 @@ impl FieldUi {
                 Color32::from_black_alpha(220),
             );
         }
+        self.drop_target(ui, cx, area, resp.rect, true);
         if resp.clicked() {
             self.open_pile = if self.open_pile == Some(area) {
                 None
@@ -390,113 +540,289 @@ impl FieldUi {
                 Some(area)
             };
         }
-        None
     }
 
-    fn action_panel(
-        &mut self,
-        ui: &mut egui::Ui,
-        images: &mut ImageCache,
-        v: View,
-    ) -> Option<FieldEvent> {
-        let mut event = None;
-        match self.pending.clone() {
-            Pending::None => {
-                ui.label(RichText::new(tr("field.how_title")).strong());
-                ui.label(tr("field.how_1"));
-                ui.label(tr("field.how_2"));
-                ui.label(tr("field.how_3"));
+    /// Deck oder Extra Deck als Kartenstapel. Ein Klick öffnet die Kartenauswahl.
+    fn deck_pile(&mut self, ui: &mut egui::Ui, cx: &mut Cx, area: Area) {
+        let hl = (cx.hint_area == Some(area)).then_some(GOOD_COLOR);
+        let resp =
+            empty_cell(ui, cx.w, short_label(area), hl, true).on_hover_text(tr("field.deck_hint"));
+        let face_up = cx.board.extra_face_up.len();
+        if area == Area::ExtraDeck {
+            self.extra_rect = Some(resp.rect);
+            if face_up > 0 {
+                super::widgets::pill(
+                    ui.painter(),
+                    resp.rect.center_bottom() + Vec2::new(0.0, -3.0),
+                    Align2::CENTER_BOTTOM,
+                    &format!("+{face_up}"),
+                    11.0,
+                    Color32::from_black_alpha(220),
+                );
             }
-            Pending::Card { slot, from } => {
-                ui.horizontal(|ui| {
-                    card_widget(ui, images, v, &slot, Marks::default(), 48.0, None);
-                    ui.vertical(|ui| {
-                        ui.label(RichText::new(shown_name(v, &slot)).strong());
-                        ui.label(trf("field.from", &[&area_label(from)]));
-                    });
-                });
-                ui.add_space(4.0);
-                ui.label(RichText::new(tr("field.choose_action")).strong());
-                let kind = kind_of(v.db, &slot);
-                egui::ScrollArea::vertical()
-                    .max_height(520.0)
-                    .show(ui, |ui| {
-                        for g in Action::GROUPS {
-                            ui.label(RichText::new(tr(g.key)).color(SELECT_COLOR).small());
-                            ui.horizontal_wrapped(|ui| {
-                                for a in g.actions {
-                                    let a = match a {
-                                        Action::Chain(_) => Action::Chain(self.chain_no.max(1)),
-                                        other => *other,
-                                    };
-                                    let text = match a {
-                                        Action::Chain(_) => tr("action.chain").to_string(),
-                                        other => other.label(),
-                                    };
-                                    if ui.small_button(text).clicked() {
-                                        let dest = dest_for(a, kind, from);
-                                        if dest.needs_choice() {
-                                            self.pending = Pending::Zone {
-                                                slot: slot.clone(),
-                                                from,
-                                                action: a,
-                                                dest,
-                                            };
-                                        } else {
-                                            event = Some(FieldEvent::Move(Move {
-                                                slot: slot.clone(),
-                                                from,
-                                                action: a,
-                                                to: None,
-                                            }));
-                                        }
-                                    }
-                                    if matches!(a, Action::Chain(_)) {
-                                        if self.chain_no == 0 {
-                                            self.chain_no = 1;
-                                        }
-                                        ui.add(
-                                            egui::DragValue::new(&mut self.chain_no).range(1..=99),
-                                        )
-                                        .on_hover_text(tr("action.chain_number"));
-                                    }
-                                }
-                            });
-                        }
-                    });
-                if ui.button(tr("common.cancel")).clicked() {
-                    self.pending = Pending::None;
-                }
-            }
-            Pending::Zone {
-                slot, action, dest, ..
-            } => {
-                ui.label(RichText::new(shown_name(v, &slot)).strong());
-                ui.label(action.label());
-                ui.add_space(4.0);
-                let hint = if dest == Dest::ChooseHandOrGy {
-                    tr("field.choose_hand_or_gy")
-                } else {
-                    tr("field.choose_zone")
-                };
-                ui.label(RichText::new(hint).color(TARGET_COLOR).strong());
-                if dest == Dest::ChooseHandOrGy {
-                    ui.horizontal(|ui| {
-                        if ui.button(tr("field.to_hand")).clicked() {
-                            event = self.finish_zone(Area::Hand);
-                        }
-                        if ui.button(tr("field.to_gy")).clicked() {
-                            event = self.finish_zone(Area::Gy);
-                        }
-                    });
-                }
-                if ui.button(tr("common.back")).clicked()
-                    && let Pending::Zone { slot, from, .. } = self.pending.clone()
-                {
-                    self.pending = Pending::Card { slot, from };
-                }
+        } else {
+            self.deck_rect = Some(resp.rect);
+        }
+        self.drop_target(ui, cx, area, resp.rect, true);
+        if resp.clicked() {
+            if area == Area::ExtraDeck && face_up > 0 {
+                // Offene Karten im Extra Deck zeigen; von dort geht es zur Auswahl.
+                self.open_pile = Some(Area::ExtraDeck);
+            } else {
+                cx.event = Some(FieldEvent::Pick(area));
             }
         }
-        event
+    }
+
+    /// Führt eine gewählte Aktion aus oder wartet auf die Zielzone.
+    fn choose(&mut self, cx: &mut Cx, slot: Slot, from: Area, action: Action, to: Option<Area>) {
+        let t = traits_of(cx.v.db, &slot);
+        let dest = dest_for(action, t.kind, from);
+        let mv = |to: Option<Area>| {
+            Some(FieldEvent::Move(Move {
+                slot: slot.clone(),
+                from,
+                action,
+                to,
+            }))
+        };
+        if !dest.needs_choice() {
+            cx.event = mv(None);
+            return;
+        }
+        if dest == Dest::ChooseHandOrGy {
+            let target = to.filter(|a| dest.accepts(*a)).unwrap_or(Area::Hand);
+            cx.event = mv(Some(target));
+            return;
+        }
+        if let Some(to) = to.filter(|a| dest.accepts(*a) && cx.board.zone(*a).is_none()) {
+            cx.event = mv(Some(to));
+            return;
+        }
+        let free: Vec<Area> = Board::field_areas()
+            .into_iter()
+            .filter(|a| dest.accepts(*a) && cx.board.zone(*a).is_none())
+            .collect();
+        if free.len() == 1 {
+            cx.event = mv(Some(free[0]));
+        } else if cx.auto_zone && !free.is_empty() {
+            let prefer = if t.extra_summon.is_some() {
+                Zone::ExtraMonsterZone
+            } else {
+                Zone::None
+            };
+            cx.event = mv(cx.board.first_free(dest, prefer));
+        } else {
+            self.pending = Pending::Zone {
+                slot,
+                from,
+                action,
+                dest,
+            };
+        }
+    }
+
+    /// Menü direkt an der gewählten Karte.
+    fn menu(&mut self, ctx: &egui::Context, cx: &mut Cx) {
+        let Pending::Card {
+            slot,
+            from,
+            pos,
+            to,
+            only,
+            show_all,
+        } = self.pending.clone()
+        else {
+            return;
+        };
+        let t = traits_of(cx.v.db, &slot);
+        let face_down = cx.board.zone(from).is_some_and(|c| c.face_down);
+        let actions = only
+            .clone()
+            .unwrap_or_else(|| context_actions(&t, from, face_down));
+        let chain_no = self.chain_no.max(1);
+        let mut chosen: Option<Action> = None;
+        let mut toggle_all = false;
+        let mut new_chain_no = chain_no;
+
+        let area = egui::Area::new(egui::Id::unique("field_action_menu"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(pos)
+            .constrain(true)
+            .show(ctx, |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.set_width(210.0);
+                    ui.label(RichText::new(shown_name(cx.v, &slot)).strong());
+                    let place = match to {
+                        Some(to) => format!("{} → {}", area_label(from), area_label(to)),
+                        None => trf("field.from", &[&area_label(from)]),
+                    };
+                    ui.label(RichText::new(place).weak().small());
+                    ui.separator();
+                    let mut action_button = |ui: &mut egui::Ui, a: Action, small: bool| {
+                        let a = match a {
+                            Action::Chain(_) => Action::Chain(new_chain_no),
+                            other => other,
+                        };
+                        ui.horizontal(|ui| {
+                            let text = match a {
+                                Action::Chain(_) => tr("action.chain").to_string(),
+                                other => other.label(),
+                            };
+                            let width = if matches!(a, Action::Chain(_)) {
+                                150.0
+                            } else {
+                                210.0
+                            };
+                            let button = if small {
+                                egui::Button::new(RichText::new(text).small())
+                            } else {
+                                egui::Button::new(text)
+                            };
+                            if ui.add(button.min_size(Vec2::new(width, 0.0))).clicked() {
+                                chosen = Some(a);
+                            }
+                            if matches!(a, Action::Chain(_)) {
+                                ui.add(egui::DragValue::new(&mut new_chain_no).range(1..=99))
+                                    .on_hover_text(tr("action.chain_number"));
+                            }
+                        });
+                    };
+                    for a in &actions {
+                        action_button(ui, *a, false);
+                    }
+                    if only.is_none() {
+                        ui.separator();
+                        if ui
+                            .selectable_label(show_all, tr("field.more_actions"))
+                            .clicked()
+                        {
+                            toggle_all = true;
+                        }
+                        if show_all {
+                            egui::ScrollArea::vertical()
+                                .max_height(260.0)
+                                .show(ui, |ui| {
+                                    for g in Action::GROUPS {
+                                        let rest: Vec<Action> = g
+                                            .actions
+                                            .iter()
+                                            .copied()
+                                            .filter(|a| !actions.iter().any(|b| b.same_kind(*a)))
+                                            .collect();
+                                        if rest.is_empty() {
+                                            continue;
+                                        }
+                                        ui.label(
+                                            RichText::new(tr(g.key)).color(SELECT_COLOR).small(),
+                                        );
+                                        for a in rest {
+                                            action_button(ui, a, true);
+                                        }
+                                    }
+                                });
+                        }
+                    }
+                });
+            });
+
+        self.chain_no = new_chain_no;
+        if toggle_all && let Pending::Card { show_all, .. } = &mut self.pending {
+            *show_all = !*show_all;
+        }
+        if let Some(a) = chosen {
+            self.pending = Pending::None;
+            self.choose(cx, slot, from, a, to);
+            return;
+        }
+        // Klick neben das Menü schließt es.
+        let rect = area.response.rect;
+        let pressed_outside = ctx.input(|i| {
+            i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !rect.contains(p))
+        });
+        if pressed_outside && !self.menu_fresh {
+            self.pending = Pending::None;
+        }
+    }
+
+    /// Zeichnet die gezogene Karte am Mauszeiger und wertet das Loslassen aus.
+    fn drag_and_drop(&mut self, ctx: &egui::Context, cx: &mut Cx) {
+        let Some((slot, from)) = self.drag.clone() else {
+            return;
+        };
+        let pointer = ctx.input(|i| i.pointer.interact_pos());
+        if let Some(p) = pointer {
+            let size = Vec2::new(cx.w, cx.w * CARD_RATIO) * 0.9;
+            let rect = Rect::from_center_size(p, size);
+            let painter = ctx.layer_painter(egui::LayerId::new(
+                egui::Order::Tooltip,
+                egui::Id::unique("field_drag_ghost"),
+            ));
+            let tex = match &slot {
+                Slot::Card { image_id, .. } => cx.images.get(*image_id).map(|t| t.id()),
+                Slot::Placeholder { .. } => None,
+            };
+            match tex {
+                Some(id) => {
+                    let uv = Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0));
+                    painter.image(id, rect, uv, Color32::from_white_alpha(215));
+                }
+                None => {
+                    painter.rect_filled(rect, 5.0, Color32::from_rgb(90, 70, 150));
+                }
+            }
+            painter.rect_stroke(
+                rect,
+                5.0,
+                Stroke::new(2.0, SELECT_COLOR),
+                StrokeKind::Outside,
+            );
+            ctx.request_repaint();
+        }
+        if !ctx.input(|i| i.pointer.any_released()) {
+            return;
+        }
+        self.drag = None;
+        let Some(to) = self.hover else { return };
+        let t = traits_of(cx.v.db, &slot);
+        let face_down = cx.board.zone(from).is_some_and(|c| c.face_down);
+        let fits: Vec<Action> = context_actions(&t, from, face_down)
+            .into_iter()
+            .filter(|a| action_reaches(*a, t.kind, from, to))
+            .collect();
+        match fits.len() {
+            0 => {
+                // Keine übliche Aktion: alle passenden Aktionen anbieten.
+                let all: Vec<Action> = Action::GROUPS
+                    .iter()
+                    .flat_map(|g| g.actions.iter().copied())
+                    .filter(|a| action_reaches(*a, t.kind, from, to))
+                    .collect();
+                if !all.is_empty() {
+                    self.open_drop_menu(slot, from, to, all, pointer);
+                }
+            }
+            1 => self.choose(cx, slot, from, fits[0], Some(to)),
+            _ => self.open_drop_menu(slot, from, to, fits, pointer),
+        }
+    }
+
+    fn open_drop_menu(
+        &mut self,
+        slot: Slot,
+        from: Area,
+        to: Area,
+        actions: Vec<Action>,
+        pointer: Option<Pos2>,
+    ) {
+        self.pending = Pending::Card {
+            slot,
+            from,
+            pos: pointer.unwrap_or(Pos2::new(320.0, 320.0)) + Vec2::new(8.0, 8.0),
+            to: Some(to),
+            only: Some(actions),
+            show_all: false,
+        };
+        self.menu_fresh = true;
     }
 }

@@ -563,4 +563,78 @@ pub const T: &[(&str, &str)] = &[
     ("badge.negate", "Neg"),
     ("badge.target", "Ziel"),
     ("badge.change_position", "Pos"),
+    (
+        "field.status_idle",
+        "Klicke eine Karte an, um ihre Aktionen zu sehen, oder ziehe sie auf eine Zone. Esc oder Rechtsklick bricht ab.",
+    ),
+    ("field.more_actions", "Weitere Aktionen …"),
+    ("field.deck_hint", "Klick: Karte von hier auswählen."),
+    ("cell.deck", "Deck"),
+    ("practice.hint", "Tipp"),
+    (
+        "practice.hint_hint",
+        "Markiert die Karte des nächsten Zugs grün. Der Zug zählt dann nicht mehr als beim ersten Versuch richtig.",
+    ),
+    ("practice.hint_text", "Tipp: Der nächste Zug benutzt {0}."),
+    ("editor.meta", "Combo-Daten (Titel, Deck, Notizen, Teilen)"),
+    (
+        "editor.hand_click_hint",
+        "Klick auf eine Karte entfernt sie. Das Spielfeld darunter wird automatisch neu aufgebaut.",
+    ),
+    ("rec.undo_hint", "Tastenkürzel: Strg+Z"),
+    ("settings.auto_zone", "Spielfeld: Zone automatisch wählen"),
+    (
+        "settings.auto_zone_hint",
+        "An: Eine beschworene oder gelegte Karte kommt in die erste freie Zone. Aus: Du klickst die Zone an.",
+    ),
+    // Hand test, combo filter
+    ("view.hand_test", "Handtest"),
+    ("combo.filter_hint", "Combos suchen …"),
+    ("combo.filter_no_match", "Keine Combo passt zur Suche."),
+    (
+        "handtest.no_decks",
+        "Du hast noch kein Deck. Lege zuerst unter „Decks“ ein Deck an.",
+    ),
+    (
+        "handtest.intro",
+        "Ziehe eine zufällige Starthand aus dem Main Deck. Unter der Hand siehst du, welche gespeicherten Combos damit spielbar sind.",
+    ),
+    ("handtest.deck", "Deck:"),
+    ("handtest.main_deck_count", "Main Deck: {0} Karten"),
+    (
+        "handtest.deck_empty",
+        "Dieses Deck hat keine Karten im Main Deck. Füge zuerst unter „Decks“ Karten hinzu.",
+    ),
+    ("handtest.hand_size", "Handgröße:"),
+    ("handtest.draw", "Hand ziehen"),
+    ("handtest.simulate", "{0} Hände simulieren"),
+    (
+        "handtest.simulate_hint",
+        "Zieht viele zufällige Hände und zählt, wie oft jede Combo spielbar ist.",
+    ),
+    (
+        "handtest.no_hand",
+        "Noch keine Hand gezogen. Klicke auf „Hand ziehen“.",
+    ),
+    ("handtest.hand", "Deine Hand"),
+    ("handtest.playable", "Spielbare Combos"),
+    (
+        "handtest.none_playable",
+        "Mit dieser Hand ist keine gespeicherte Combo spielbar.",
+    ),
+    ("handtest.open", "Öffnen"),
+    ("handtest.linked", "(mit diesem Deck verknüpft)"),
+    (
+        "handtest.stats_title",
+        "Statistik: {0} Hände mit je {1} Karten",
+    ),
+    (
+        "handtest.stats_no_combos",
+        "Keine Combo hat eine Starthand. Trage zuerst bei einer Combo eine Starthand ein.",
+    ),
+    ("handtest.stats_percent", "{0} %"),
+    (
+        "handtest.stats_any",
+        "Mindestens eine Combo spielbar: {0} %",
+    ),
 ];

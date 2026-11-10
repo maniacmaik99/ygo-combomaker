@@ -131,6 +131,175 @@ pub fn dest_for(action: Action, kind: CardKind, from: Area) -> Dest {
     }
 }
 
+/// Eigenschaften einer Karte, die bestimmen, welche Aktionen sinnvoll sind.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct CardTraits {
+    pub kind: CardKind,
+    /// Passende Beschwörung aus dem Extra Deck (Fusion, Synchro, Xyz, Link).
+    pub extra_summon: Option<Action>,
+    pub pendulum: bool,
+    pub ritual: bool,
+}
+
+/// Festes Ziel einer Aktion (ohne Auswahl), falls es eins gibt.
+pub fn fixed_area(dest: Dest) -> Option<Area> {
+    match dest {
+        Dest::Hand => Some(Area::Hand),
+        Dest::Gy => Some(Area::Gy),
+        Dest::Banished => Some(Area::Banished),
+        Dest::Deck => Some(Area::Deck),
+        Dest::ExtraDeck => Some(Area::ExtraDeck),
+        Dest::Overlay => Some(Area::Overlay),
+        _ => None,
+    }
+}
+
+/// Kann die Aktion die Karte nach `to` bringen?
+pub fn action_reaches(action: Action, kind: CardKind, from: Area, to: Area) -> bool {
+    let dest = dest_for(action, kind, from);
+    if dest.needs_choice() {
+        dest.accepts(to)
+    } else {
+        fixed_area(dest) == Some(to)
+    }
+}
+
+/// Die Aktionen, die für diese Karte an diesem Ort üblich sind – wie das
+/// Menü, das in Master Duel beim Anklicken einer Karte erscheint.
+/// Die wichtigste Aktion steht zuerst.
+pub fn context_actions(t: &CardTraits, from: Area, face_down: bool) -> Vec<Action> {
+    use Action::*;
+    let monster = t.kind == CardKind::Monster;
+    let mut v: Vec<Action> = match from {
+        Area::Hand if monster => {
+            let mut v = vec![NormalSummon, SpecialSummon, Set, Activate];
+            if t.pendulum {
+                v.push(PlacePendulum);
+                v.push(PendulumSummon);
+            }
+            if t.ritual {
+                v.push(RitualSummon);
+            }
+            v.extend([
+                Discard,
+                UseAsMaterial,
+                TributeSummon,
+                SendToGy,
+                Banish,
+                Reveal,
+                ReturnToDeck,
+            ]);
+            v
+        }
+        Area::Hand if t.kind == CardKind::Spell => {
+            vec![
+                Activate,
+                SetSpellTrap,
+                Discard,
+                SendToGy,
+                Banish,
+                Reveal,
+                ReturnToDeck,
+            ]
+        }
+        Area::Hand => vec![
+            SetSpellTrap,
+            Activate,
+            Discard,
+            SendToGy,
+            Banish,
+            Reveal,
+            ReturnToDeck,
+        ],
+        Area::Deck if monster => {
+            let mut v = vec![Search, SendToGy, SpecialSummon, Draw, Banish];
+            if t.pendulum {
+                v.push(PlacePendulum);
+                v.push(ReturnToExtraDeck);
+            }
+            v
+        }
+        Area::Deck => vec![Search, SendToGy, Activate, SetSpellTrap, Draw, Banish],
+        Area::ExtraDeck => {
+            let mut v = Vec::new();
+            v.extend(t.extra_summon);
+            if t.pendulum {
+                v.push(PendulumSummon);
+            }
+            v.extend([SpecialSummon, SendToGy, Banish, Reveal]);
+            v
+        }
+        Area::Gy if monster => vec![
+            SpecialSummon,
+            GyToHand,
+            Activate,
+            Banish,
+            GyToDeck,
+            AttachMaterial,
+            Target,
+        ],
+        Area::Gy => vec![Activate, GyToHand, Banish, GyToDeck, SetSpellTrap, Target],
+        Area::Banished if monster => vec![
+            SpecialSummon,
+            BanishedToHand,
+            BanishedToGy,
+            Activate,
+            ReturnToDeck,
+        ],
+        Area::Banished => vec![BanishedToHand, BanishedToGy, Activate, ReturnToDeck],
+        Area::Overlay => vec![DetachMaterial],
+        Area::Monster(_) | Area::Emz(_) => {
+            let mut v = Vec::new();
+            if face_down {
+                v.push(FlipSummon);
+            }
+            v.extend([
+                Activate,
+                UseAsMaterial,
+                SendToGy,
+                Tribute,
+                ReturnToHand,
+                Banish,
+                Destroy,
+                AttachMaterial,
+            ]);
+            if t.extra_summon.is_some() || t.pendulum {
+                v.push(ReturnToExtraDeck);
+            }
+            v.extend([ReturnToDeck, ChangePosition, Negate, Target]);
+            v
+        }
+        Area::SpellTrap(_) | Area::Field => {
+            vec![
+                Activate,
+                SendToGy,
+                Destroy,
+                ReturnToHand,
+                Banish,
+                ReturnToDeck,
+                Negate,
+                Target,
+            ]
+        }
+        Area::PendulumLeft | Area::PendulumRight => {
+            vec![
+                Activate,
+                SpecialSummon,
+                Destroy,
+                ReturnToExtraDeck,
+                SendToGy,
+                ReturnToHand,
+                Banish,
+            ]
+        }
+    };
+    // „Kettenglied“ überall dort, wo man einen Effekt aktivieren kann.
+    if let Some(i) = v.iter().position(|a| *a == Activate) {
+        v.insert(i + 1, Chain(1));
+    }
+    v
+}
+
 /// Wird die Karte bei dieser Aktion verdeckt hingelegt?
 pub fn placed_face_down(action: Action) -> bool {
     matches!(action, Action::Set | Action::SetSpellTrap)
@@ -341,7 +510,10 @@ impl Board {
         let Some(to) = target else {
             // Karte bleibt liegen. Bei Flippen/Aufdecken wird sie offen.
             if mv.from.is_field_zone()
-                && mv.action == Action::FlipSummon
+                && matches!(
+                    mv.action,
+                    Action::FlipSummon | Action::Activate | Action::Chain(_)
+                )
                 && let Some(Some(c)) = self.zone_mut(mv.from)
             {
                 c.face_down = false;
@@ -475,6 +647,70 @@ pub fn flatten(steps: &[Step]) -> Vec<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn context_menu_matches_card_and_place() {
+        let monster = CardTraits::default();
+        let hand = context_actions(&monster, Area::Hand, false);
+        assert_eq!(hand[0], Action::NormalSummon);
+        assert!(!hand.contains(&Action::PlacePendulum));
+        let link = CardTraits {
+            extra_summon: Some(Action::LinkSummon),
+            ..Default::default()
+        };
+        assert_eq!(
+            context_actions(&link, Area::ExtraDeck, false)[0],
+            Action::LinkSummon
+        );
+        let trap = CardTraits {
+            kind: CardKind::Trap,
+            ..Default::default()
+        };
+        assert_eq!(
+            context_actions(&trap, Area::Hand, false)[0],
+            Action::SetSpellTrap
+        );
+        assert!(context_actions(&monster, Area::Monster(0), true).contains(&Action::FlipSummon));
+        // Ziehen auf eine Zone: nur passende Aktionen.
+        assert!(action_reaches(
+            Action::NormalSummon,
+            CardKind::Monster,
+            Area::Hand,
+            Area::Monster(1)
+        ));
+        assert!(!action_reaches(
+            Action::NormalSummon,
+            CardKind::Monster,
+            Area::Hand,
+            Area::SpellTrap(1)
+        ));
+        assert!(action_reaches(
+            Action::Discard,
+            CardKind::Monster,
+            Area::Hand,
+            Area::Gy
+        ));
+    }
+
+    #[test]
+    fn activating_a_set_card_turns_it_face_up() {
+        let mut b = Board::with_hand(&[Entry::new(card(6))]);
+        let set = Move {
+            slot: card(6),
+            from: Area::Hand,
+            action: Action::SetSpellTrap,
+            to: Some(Area::SpellTrap(0)),
+        };
+        b.apply(&set, CardKind::Trap).unwrap();
+        let act = Move {
+            slot: card(6),
+            from: Area::SpellTrap(0),
+            action: Action::Activate,
+            to: None,
+        };
+        b.apply(&act, CardKind::Trap).unwrap();
+        assert!(!b.zone(Area::SpellTrap(0)).unwrap().face_down);
+    }
 
     fn card(id: u32) -> Slot {
         Slot::Card {
