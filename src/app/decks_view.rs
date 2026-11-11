@@ -163,36 +163,42 @@ impl ComboApp {
             ui.separator();
             ui.label(RichText::new(tr("deck.click_hint")).weak());
             let deck = &self.decks[di];
-            ui.horizontal_wrapped(|ui| {
-                for c in &deck.cards {
-                    ui.vertical(|ui| {
-                        ui.set_width(width + 6.0);
-                        let slot = c.to_slot();
-                        let r = card_widget(
-                            ui,
-                            &mut self.images,
-                            v,
-                            &slot,
-                            Marks::default(),
-                            width,
-                            None,
-                        );
-                        if r.clicked() {
-                            remove_one = Some(c.id);
-                        }
-                        if r.secondary_clicked() {
-                            add_one = Some(c.clone());
-                        }
-                        let over = v.ban.get(&c.id).is_some_and(|l| c.count > l.max_copies());
-                        let count = RichText::new(format!("{}×", c.count)).strong();
-                        ui.label(if over {
-                            count.color(super::widgets::BAD_COLOR)
-                        } else {
-                            count
+            // Feste Spaltenzahl aus der verfügbaren Breite: so bricht die Liste
+            // sicher in mehrere Reihen um.
+            let cell = width + 6.0 + ui.spacing().item_spacing.x;
+            let columns = ((ui.available_width() / cell).floor() as usize).max(1);
+            for row in deck.cards.chunks(columns) {
+                ui.horizontal_top(|ui| {
+                    for c in row {
+                        ui.vertical(|ui| {
+                            ui.set_width(width + 6.0);
+                            let slot = c.to_slot();
+                            let r = card_widget(
+                                ui,
+                                &mut self.images,
+                                v,
+                                &slot,
+                                Marks::default(),
+                                width,
+                                None,
+                            );
+                            if r.clicked() {
+                                remove_one = Some(c.id);
+                            }
+                            if r.secondary_clicked() {
+                                add_one = Some(c.clone());
+                            }
+                            let over = v.ban.get(&c.id).is_some_and(|l| c.count > l.max_copies());
+                            let count = RichText::new(format!("{}×", c.count)).strong();
+                            ui.label(if over {
+                                count.color(super::widgets::BAD_COLOR)
+                            } else {
+                                count
+                            });
                         });
-                    });
-                }
-            });
+                    }
+                });
+            }
         });
 
         let deck = &mut self.decks[di];

@@ -273,7 +273,9 @@ pub fn entry_view(
     width: f32,
     highlight: Option<Color32>,
 ) -> egui::Response {
-    ui.vertical(|ui| {
+    // Feste Größe anfordern, damit umbrechende Reihen vor der Karte umbrechen.
+    let size = Vec2::new(width + 6.0, width * CARD_RATIO);
+    ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
         ui.set_width(width + 6.0);
         let r = card_widget(
             ui,
