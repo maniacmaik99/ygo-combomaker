@@ -568,6 +568,10 @@ pub const T: &[(&str, &str)] = &[
     ("handtest.play_close", "Close board"),
     ("handtest.needs", "needs: {0}"),
     ("handtest.any_card", "any card"),
+    (
+        "update.err.not_writable",
+        "The program is installed in {0}, where it cannot replace itself (installed from a package). Please download the new package from the GitHub releases page and install it.",
+    ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

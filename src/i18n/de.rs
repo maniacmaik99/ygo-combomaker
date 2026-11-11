@@ -598,6 +598,10 @@ pub const T: &[(&str, &str)] = &[
     ("handtest.play_close", "Spielfeld schließen"),
     ("handtest.needs", "braucht: {0}"),
     ("handtest.any_card", "beliebige Karte"),
+    (
+        "update.err.not_writable",
+        "Das Programm liegt in {0} und kann sich dort nicht selbst ersetzen (aus einem Paket installiert). Lade bitte das neue Paket von der GitHub-Release-Seite herunter und installiere es.",
+    ),
     ("settings.auto_zone", "Spielfeld: Zone automatisch wählen"),
     (
         "settings.auto_zone_hint",

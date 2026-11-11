@@ -1,8 +1,10 @@
 [package]
 name = "ygo-combomaker"
-version = "0.6.3"
+version = "0.7.0"
 edition = "2024"
-description = "Desktop-App zum Eintragen und Üben von Yu-Gi-Oh!-Combos"
+description = "Desktop app to enter and practice Yu-Gi-Oh! combos"
+authors = ["maniacmaik99 <229810895+maniacmaik99@users.noreply.github.com>"]
+readme = "README.md"
 license = "MIT"
 repository = "https://github.com/maniacmaik99/ygo-combomaker"
 
@@ -27,3 +29,27 @@ winresource = "0.1"
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+# Debian/Ubuntu-Paket: `cargo deb`
+[package.metadata.deb]
+name = "ygo-combomaker"
+section = "games"
+priority = "optional"
+depends = "libc6, libxkbcommon0, libgl1"
+extended-description = "Enter Yu-Gi-Oh! combos by playing them on a board and practice them move by move."
+assets = [
+    ["target/release/ygo-combomaker", "usr/bin/", "755"],
+    ["assets/ygo-combomaker.desktop", "usr/share/applications/", "644"],
+    ["assets/icon-512.png", "usr/share/icons/hicolor/512x512/apps/ygo-combomaker.png", "644"],
+]
+
+# Fedora/openSUSE-Paket: `cargo generate-rpm`
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/ygo-combomaker", dest = "/usr/bin/ygo-combomaker", mode = "755" },
+    { source = "assets/ygo-combomaker.desktop", dest = "/usr/share/applications/ygo-combomaker.desktop", mode = "644" },
+    { source = "assets/icon-512.png", dest = "/usr/share/icons/hicolor/512x512/apps/ygo-combomaker.png", mode = "644" },
+]
+
+[package.metadata.generate-rpm.requires]
+libxkbcommon = "*"

@@ -64,6 +64,24 @@ jobs:
         with:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}
+      # Linux: zusätzlich .deb (Debian/Ubuntu), .rpm (Fedora) und .tar.gz.
+      - name: Linux-Pakete bauen
+        if: runner.os == 'Linux'
+        run: |
+          cargo install cargo-deb cargo-generate-rpm --locked
+          mkdir -p target/release pkg
+          cp target/${{ matrix.target }}/release/ygo-combomaker target/release/ygo-combomaker
+          strip target/release/ygo-combomaker
+          cargo deb --no-build --no-strip --output pkg/ygo-combomaker-linux-amd64.deb
+          cargo generate-rpm --output pkg/ygo-combomaker-linux-x86_64.rpm
+          mkdir ygo-combomaker
+          cp target/release/ygo-combomaker install.sh assets/ygo-combomaker.desktop assets/icon-512.png README.md ygo-combomaker/
+          tar czf pkg/ygo-combomaker-linux-x86_64.tar.gz ygo-combomaker
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: linux-packages
+          path: pkg/*
 
   release:
     needs: [version, build]

@@ -643,6 +643,10 @@ pub const T: &[(&str, &str)] = &[
     ("handtest.play_close", "Fermer le terrain"),
     ("handtest.needs", "nécessite : {0}"),
     ("handtest.any_card", "n'importe quelle carte"),
+    (
+        "update.err.not_writable",
+        "Le programme est installé dans {0}, où il ne peut pas se remplacer lui-même (installé depuis un paquet). Télécharge le nouveau paquet sur la page des versions GitHub et installe-le.",
+    ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

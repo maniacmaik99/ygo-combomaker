@@ -122,6 +122,17 @@ pub fn check(token: &str) -> Result<Option<UpdateInfo>> {
 /// Gibt den Pfad zurück, unter dem das neue Programm gestartet werden kann.
 pub fn install(info: &UpdateInfo, token: &str) -> Result<PathBuf> {
     let exe = std::env::current_exe().context(tr("update.err.exe_path"))?;
+    // Aus einem Paket (.deb/.rpm) installiert: Der Ordner gehört root,
+    // das Programm kann sich nicht selbst ersetzen.
+    if let Some(dir) = exe.parent() {
+        let probe = dir.join(".ygo-combomaker-write-test");
+        match std::fs::write(&probe, b"") {
+            Ok(()) => {
+                let _ = std::fs::remove_file(&probe);
+            }
+            Err(_) => bail!("{}", trf("update.err.not_writable", &[&dir.display()])),
+        }
+    }
     let (url, accept) = if token.trim().is_empty() {
         (info.download_url.as_str(), "application/octet-stream")
     } else {

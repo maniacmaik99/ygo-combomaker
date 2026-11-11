@@ -1,7 +1,86 @@
-# YGO Combomaker
+<p align="center">
+  <img src="assets/icon-512.png" width="120" alt="YGO Combomaker Logo">
+</p>
 
-Desktop-App in Rust zum Eintragen und Üben von Yu-Gi-Oh!-Combos (Master Duel, TCG).
-Keine Anmeldung, keine Web-Technik: Oberfläche mit [egui/eframe](https://github.com/emilk/egui), läuft nativ unter Linux und Windows.
+<h1 align="center">YGO Combomaker</h1>
+
+<p align="center">
+  Yu-Gi-Oh!-Combos eintragen und auf einem Spielfeld üben – für Master Duel und TCG.<br>
+  Native Desktop-App in Rust. Keine Anmeldung, kein Browser, kein Electron.
+</p>
+
+<p align="center">
+  <a href="https://github.com/maniacmaik99/ygo-combomaker/releases/latest"><img alt="Neueste Version" src="https://img.shields.io/github/v/release/maniacmaik99/ygo-combomaker?label=Version"></a>
+  <a href="https://github.com/maniacmaik99/ygo-combomaker/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/maniacmaik99/ygo-combomaker/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Plattformen" src="https://img.shields.io/badge/Plattform-Linux%20%7C%20Windows-5b3fd6">
+</p>
+
+<p align="center"><em>Desktop app to record and practice Yu-Gi-Oh! combos. Interface in English, German, French, Italian, Spanish and Portuguese.</em></p>
+
+![Combo auf dem Spielfeld eintragen](docs/screenshots/editor.png)
+
+| Üben | Handtest | Decklisten |
+|---|---|---|
+| ![Üben](docs/screenshots/practice.png) | ![Handtest](docs/screenshots/hand-test.png) | ![Decklisten](docs/screenshots/decks.png) |
+
+Die Bildschirmfotos zeigen Platzhalterkarten. In der App erscheinen die echten Kartenbilder.
+
+## Was die App kann
+
+- **Combo eintragen:** Starthand wählen und die Combo auf dem Spielfeld spielen. Jeder Zug wird gespeichert.
+- **Üben:** Die Combo Zug für Zug nachspielen. Die App zeigt nach jedem Zug, ob er richtig war.
+- **Handtest:** Starthände aus einer Deckliste ziehen, frei ausspielen und 1000 Hände simulieren.
+- **Decklisten:** aus einem Archetyp füllen oder importieren (ydke-Link, YDK-Datei, Kartenliste).
+- **Update-Knopf:** Die App aktualisiert sich selbst über GitHub Releases.
+
+## Installieren
+
+Alle Dateien liegen unter [Releases](https://github.com/maniacmaik99/ygo-combomaker/releases/latest). Es gibt sie nur für 64-Bit-Rechner (x86_64).
+
+### Linux: alle Distributionen (Arch, Debian, Fedora, …)
+
+1 Befehl im Terminal. Er installiert die App nur für deinen Benutzer, ohne root, mit Eintrag im Startmenü:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/maniacmaik99/ygo-combomaker/main/install.sh | sh
+```
+
+Deinstallieren:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/maniacmaik99/ygo-combomaker/main/install.sh | sh -s -- --uninstall
+```
+
+Falls der Befehl `ygo-combomaker` danach im Terminal nicht gefunden wird: `~/.local/bin` fehlt im `PATH`. Der Eintrag im Startmenü funktioniert trotzdem.
+
+### Debian, Ubuntu, Linux Mint
+
+```sh
+sudo apt install ./ygo-combomaker-linux-amd64.deb
+```
+
+### Fedora, openSUSE
+
+```sh
+sudo dnf install ./ygo-combomaker-linux-x86_64.rpm
+```
+
+### Linux ohne Installation
+
+`ygo-combomaker-linux-x86_64` herunterladen, dann:
+
+```sh
+chmod +x ygo-combomaker-linux-x86_64
+./ygo-combomaker-linux-x86_64
+```
+
+### Windows
+
+`ygo-combomaker-windows-x86_64.exe` herunterladen und starten.
+
+### Hinweis zum Update-Knopf
+
+Der Update-Knopf ersetzt die Programmdatei. Das geht nur, wenn dein Benutzer die Datei ändern darf. Bei der Installation mit `install.sh`, ohne Installation und unter Windows funktioniert er. Nach der Installation als `.deb` oder `.rpm` liegt das Programm in `/usr/bin`; dann zeigt die App einen Hinweis, und du installierst die neue Paketdatei von der Release-Seite.
 
 ## Datenquelle
 
@@ -16,13 +95,6 @@ Kartennamen, Kartentexte und Bilder kommen von der freien **YGOPRODeck-API** (ht
 Master Duel Meta hat keine offizielle, dokumentierte API. Deshalb nutzt die App deren Daten nicht.
 
 Kartentexte und -bilder: © Konami / 4K Media. Diese App ist nicht mit Konami oder YGOPRODeck verbunden.
-
-## Herunterladen
-
-Fertige Programme für Linux und Windows liegen unter „Releases“ im GitHub-Repo:
-
-- Linux: `ygo-combomaker-linux-x86_64` herunterladen, ausführbar machen (`chmod +x ygo-combomaker-linux-x86_64`), starten. Für einen Eintrag im Startmenü: Datei als `ygo-combomaker` in einen Ordner im `PATH` legen, `assets/ygo-combomaker.desktop` nach `~/.local/share/applications/` und `assets/icon-512.png` als `~/.local/share/icons/hicolor/512x512/apps/ygo-combomaker.png` kopieren.
-- Windows: `ygo-combomaker-windows-x86_64.exe` herunterladen und starten. Die Datei hat das App-Logo als Symbol.
 
 ## Updates
 
@@ -52,7 +124,7 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | Combos, Einstellungen | `~/.local/share/ygo-combomaker/` | `%APPDATA%\ygo-combomaker\data\` |
 | Kartendatenbank, Bilder | `~/.cache/ygo-combomaker/` | `%LOCALAPPDATA%\ygo-combomaker\cache\` |
 
-## Funktionen (Stand 0.6)
+## Funktionen (Stand 0.7)
 
 - **Sprachen:** Englisch, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch (Einstellungen → Sprache). Kartennamen optional in der gewählten Sprache (außer Spanisch, das bietet die Kartendatenbank nicht an).
 - **Bedienung wie im Spiel:** Karte anklicken → direkt an der Karte erscheint ein Menü mit den Aktionen, die an diesem Ort üblich sind (z. B. Hand: Normalbeschwörung, Spezialbeschwörung, Setzen, Effekt aktivieren). Oder die Karte mit der Maus auf eine Zone, den Friedhof, den Verbannt-Stapel oder die Hand ziehen. Deck und Extra Deck sind Stapel auf dem Feld. Esc oder Rechtsklick bricht ab, Strg+Z macht den letzten aufgenommenen Zug rückgängig. Optional wählt die App freie Zonen automatisch (Einstellungen).
