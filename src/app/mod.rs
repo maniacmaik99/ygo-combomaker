@@ -235,6 +235,9 @@ impl ComboApp {
         let path = self.paths.cards_file();
         let current_version = self.db.version.clone();
         let have_cards = !self.db.is_empty();
+        // Ohne Konami-Nummern funktionieren die Bannlisten nicht: neu laden,
+        // auch wenn die Version der Datenbank gleich geblieben ist.
+        let has_konami = self.db.cards.iter().any(|c| c.konami_id.is_some());
         std::thread::spawn(move || {
             let send = |m: DbMsg| {
                 let _ = tx.send(m);
@@ -256,7 +259,7 @@ impl ComboApp {
             } else if have_cards {
                 send(DbMsg::Progress(tr("db.checking_new").into()));
                 match cards::fetch_db_version() {
-                    Ok(v) if !v.is_empty() && v == current_version => {
+                    Ok(v) if !v.is_empty() && v == current_version && has_konami => {
                         send(DbMsg::UpToDate);
                         return;
                     }

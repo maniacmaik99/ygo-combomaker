@@ -244,8 +244,10 @@ struct ApiImage {
 struct ApiMisc {
     #[serde(default)]
     formats: Vec<String>,
+    /// Meist eine positive Zahl. Skill-Karten haben negative Werte; damit die
+    /// ganze Antwort trotzdem lesbar bleibt, wird hier jeder JSON-Wert angenommen.
     #[serde(default)]
-    konami_id: Option<u32>,
+    konami_id: serde_json::Value,
 }
 
 #[derive(Deserialize)]
@@ -287,7 +289,11 @@ pub fn parse_api_cards(json: &[u8]) -> Result<Vec<Card>> {
                 desc: c.desc,
                 in_master_duel: in_md,
                 alt_ids: c.card_images.iter().skip(1).map(|i| i.id).collect(),
-                konami_id: c.misc_info.iter().find_map(|m| m.konami_id),
+                konami_id: c
+                    .misc_info
+                    .iter()
+                    .find_map(|m| m.konami_id.as_u64())
+                    .and_then(|k| u32::try_from(k).ok()),
             }
         })
         .collect())
@@ -368,7 +374,8 @@ mod tests {
       {"id":24094653,"name":"Polymerization","type":"Spell Card","frameType":"spell",
        "desc":"Fusion Summon.","race":"Normal",
        "card_images":[{"id":24094653}],"misc_info":[{"formats":["TCG"]}]},
-      {"id":1,"name":"Solemn Judgment","type":"Trap Card","desc":"","card_images":[]}
+      {"id":1,"name":"Solemn Judgment","type":"Trap Card","desc":"","card_images":[],
+       "misc_info":[{"formats":["Duel Links"],"konami_id":-13}]}
     ]}"#;
 
     #[test]
@@ -379,6 +386,8 @@ mod tests {
         assert!(cards[0].in_master_duel);
         assert_eq!(cards[0].konami_id, Some(4007));
         assert_eq!(cards[1].konami_id, None);
+        // Negative Nummer (Skill-Karten): Karte bleibt lesbar, ohne Nummer.
+        assert_eq!(cards[2].konami_id, None);
         assert_eq!(cards[0].image_id, 46986414);
         assert_eq!(cards[1].kind, CardKind::Spell);
         assert!(!cards[1].in_master_duel);
