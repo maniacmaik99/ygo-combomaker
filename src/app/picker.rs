@@ -67,6 +67,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let Some(picker) = &mut self.picker else {
             return;

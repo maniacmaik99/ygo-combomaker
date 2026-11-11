@@ -646,6 +646,22 @@ pub const T: &[(&str, &str)] = &[
         "textimport.copy_hint",
         "Experimentell: kopiert die Combo im Textformat. Der Text lässt sich bearbeiten und wieder importieren.",
     ),
+    ("settings.format", "Bannliste:"),
+    (
+        "settings.format_hint",
+        "Spielversion, deren Liste der verbotenen und limitierten Karten auf den Karten angezeigt und in Decklisten geprüft wird. Die Listen werden bei jedem Start neu geladen.",
+    ),
+    ("ban.forbidden", "Verboten"),
+    ("ban.limited", "Limitiert (1 Kopie)"),
+    ("ban.semi", "Halb-limitiert (2 Kopien)"),
+    ("ban.list_date", "Liste vom {0}"),
+    (
+        "ban.not_loaded",
+        "Bannliste noch nicht geladen (keine Internetverbindung?)",
+    ),
+    ("ban.deck_ok", "alle Karten sind in dieser Anzahl erlaubt"),
+    ("ban.deck_bad", "{0} Karte(n) mit zu vielen Kopien"),
+    ("ban.deck_line", "{0}: {1} – {2}× im Deck, erlaubt: {3}"),
     ("settings.auto_zone", "Spielfeld: Zone automatisch wählen"),
     (
         "settings.auto_zone_hint",

@@ -31,6 +31,7 @@ Die Bildschirmfotos zeigen Platzhalterkarten. In der App erscheinen die echten K
 - **Üben:** Die Combo Zug für Zug nachspielen. Die App zeigt nach jedem Zug, ob er richtig war.
 - **Handtest:** Starthände aus einer Deckliste ziehen, frei ausspielen und 1000 Hände simulieren.
 - **Decklisten:** aus einem Archetyp füllen oder importieren (ydke-Link, YDK-Datei, Kartenliste).
+- **Bannliste:** Master Duel, TCG oder OCG wählbar. Verbotene und limitierte Karten sind markiert, Decklisten werden geprüft. Die Listen werden bei jedem Start neu geladen.
 - **Combo als Text (experimentell):** Combo in Kurzschrift tippen oder einfügen, die App sucht die Karten selbst.
 - **Update-Knopf:** Die App aktualisiert sich selbst über GitHub Releases.
 
@@ -147,6 +148,8 @@ Kartennamen, Kartentexte und Bilder kommen von der freien **YGOPRODeck-API** (ht
 - Höchstens 20 Bild-Downloads pro Sekunde (Limit der API).
 - „Karten aktualisieren“ prüft online die Datenbank-Version und lädt nur bei Änderungen neu.
 
+Die Listen der verbotenen und limitierten Karten (Master Duel, TCG, OCG) kommen vom Projekt **YAML Yugi** (https://github.com/DawnbrandBots/yaml-yugi-limit-regulation). Es veröffentlicht die aktuellen Listen als kleine JSON-Dateien und aktualisiert sie täglich. Die App lädt sie bei jedem Start und speichert sie lokal, damit sie auch ohne Internet verfügbar sind. Die TCG-Liste dort stammt von der europäischen Konami-Seite.
+
 Master Duel Meta hat keine offizielle, dokumentierte API. Deshalb nutzt die App deren Daten nicht.
 
 Kartentexte und -bilder: © Konami / 4K Media. Diese App ist nicht mit Konami oder YGOPRODeck verbunden.
@@ -179,12 +182,13 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | Combos, Einstellungen | `~/.local/share/ygo-combomaker/` | `%APPDATA%\ygo-combomaker\data\` |
 | Kartendatenbank, Bilder | `~/.cache/ygo-combomaker/` | `%LOCALAPPDATA%\ygo-combomaker\cache\` |
 
-## Funktionen (Stand 0.8)
+## Funktionen (Stand 0.9)
 
 - **Sprachen:** Englisch, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch (Einstellungen → Sprache). Kartennamen optional in der gewählten Sprache (außer Spanisch, das bietet die Kartendatenbank nicht an).
 - **Bedienung wie im Spiel:** Karte anklicken → direkt an der Karte erscheint ein Menü mit den Aktionen, die an diesem Ort üblich sind (z. B. Hand: Normalbeschwörung, Spezialbeschwörung, Setzen, Effekt aktivieren). Oder die Karte mit der Maus auf eine Zone, den Friedhof, den Verbannt-Stapel oder die Hand ziehen. Deck und Extra Deck sind Stapel auf dem Feld. Esc oder Rechtsklick bricht ab, Strg+Z macht den letzten aufgenommenen Zug rückgängig. Optional wählt die App freie Zonen automatisch (Einstellungen).
 - **Tipp beim Üben:** markiert die Karte des nächsten Zugs.
 - **Handtest:** zieht eine zufällige Starthand aus einer Deckliste, zeigt, welche gespeicherten Combos damit spielbar sind, und simuliert 1000 Hände (Anteil der Hände, mit denen eine Combo spielbar ist). Als benötigt zählen nur die Karten der Starthand, die in den Schritten der Combo auch benutzt werden.
+- **Bannliste:** In den Einstellungen Master Duel, TCG oder OCG wählen. Karten tragen oben links eine Marke: rotes Verbotszeichen = verboten, orange 1 = limitiert, gelbe 2 = halb-limitiert. Die Decklisten-Ansicht meldet Karten mit zu vielen Kopien und zeigt das Datum der Liste.
 - **Suche in der Combo-Liste.**
 - **Freies Spiel im Handtest:** Die gezogene Hand lässt sich auf einem Spielfeld frei ausspielen (ohne Prüfung, mit Rückgängig).
 - **Kartengrößen:** getrennte Regler für die Kartengröße in Listen (bis 280) und im Fenster „Karte suchen“ (bis 220).
@@ -205,6 +209,7 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | `src/images.rs` | Bilder laden und zwischenspeichern (Hintergrund-Threads) |
 | `src/decks.rs` | Decklisten importieren (ydke, YDK, Kartenliste) |
 | `src/storage.rs` | Speicherorte, Laden/Speichern, Teilen |
+| `src/banlist.rs` | Bannlisten (Master Duel, TCG, OCG) laden und Karten zuordnen |
 | `src/board.rs` | Spielfeld-Logik: Zonen, Züge, Ziel jeder Aktion |
 | `src/practice.rs` | Logik des Übungsmodus (Züge prüfen) |
 | `src/combotext.rs` | Textformat für Combos (experimentell): Lesen und Schreiben |

@@ -673,6 +673,25 @@ pub const T: &[(&str, &str)] = &[
         "textimport.copy_hint",
         "Sperimentale: copia la combo nel formato testo. Il testo può essere modificato e importato di nuovo.",
     ),
+    ("settings.format", "Lista delle carte proibite:"),
+    (
+        "settings.format_hint",
+        "Versione del gioco la cui lista delle carte proibite e limitate viene mostrata sulle carte e controllata nei deck. Le liste vengono scaricate a ogni avvio.",
+    ),
+    ("ban.forbidden", "Proibita"),
+    ("ban.limited", "Limitata (1 copia)"),
+    ("ban.semi", "Semi-limitata (2 copie)"),
+    ("ban.list_date", "lista del {0}"),
+    (
+        "ban.not_loaded",
+        "Lista non ancora caricata (nessuna connessione Internet?)",
+    ),
+    (
+        "ban.deck_ok",
+        "tutte le carte sono permesse in questo numero",
+    ),
+    ("ban.deck_bad", "{0} carta/e con troppe copie"),
+    ("ban.deck_line", "{0}: {1} – {2}× nel deck, permesse: {3}"),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

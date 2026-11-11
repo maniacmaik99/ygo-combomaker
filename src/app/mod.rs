@@ -127,6 +127,11 @@ pub struct ComboApp {
     db: CardDb,
     db_status: String,
     db_rx: Option<Receiver<DbMsg>>,
+    /// Bannlisten aller Spielversionen und die Karten der gewählten Version.
+    banlists: crate::banlist::Banlists,
+    ban_index: std::collections::HashMap<u32, crate::banlist::Limit>,
+    ban_format: crate::banlist::Format,
+    ban_rx: Option<Receiver<Result<crate::banlist::Banlists, String>>>,
     images: ImageCache,
     picker: Option<Picker>,
     selection: Option<Sel>,
@@ -164,6 +169,7 @@ impl ComboApp {
             ),
         };
         let images = ImageCache::new(cc.egui_ctx.clone(), paths.image_dir());
+        let banlists = crate::banlist::Banlists::load_cached(&paths.cache_dir);
         let mut app = Self {
             paths,
             saved_settings: Settings::default(),
@@ -176,6 +182,10 @@ impl ComboApp {
             db: CardDb::default(),
             db_status: String::new(),
             db_rx: None,
+            banlists,
+            ban_index: Default::default(),
+            ban_format: Default::default(),
+            ban_rx: None,
             images,
             picker: None,
             selection: None,
@@ -197,6 +207,7 @@ impl ComboApp {
             update_silent: false,
         };
         app.start_db_job(cc.egui_ctx.clone(), false);
+        app.start_banlist_job(cc.egui_ctx.clone());
         if app.settings.auto_update_check {
             app.start_update_check(cc.egui_ctx.clone(), true);
         }
@@ -235,7 +246,9 @@ impl ComboApp {
                     // Ältere Datenbank ohne französische/italienische/portugiesische
                     // Namen: einmal neu laden.
                     let has_new_names = file.cards.iter().any(|c| c.names.contains_key("fr"));
-                    if has_new_names {
+                    // Ältere Datenbank ohne Konami-Nummern (für die Bannlisten).
+                    let has_konami = file.cards.iter().any(|c| c.konami_id.is_some());
+                    if has_new_names && has_konami {
                         send(DbMsg::Loaded(file));
                         return;
                     }
@@ -278,12 +291,14 @@ impl ComboApp {
     fn poll_db(&mut self) {
         let Some(rx) = &self.db_rx else { return };
         let mut finished = false;
+        let mut loaded = false;
         while let Ok(msg) = rx.try_recv() {
             match msg {
                 DbMsg::Progress(s) => self.db_status = s,
                 DbMsg::Loaded(file) => {
                     self.db = CardDb::from_file(file);
                     self.db_status = trf("db.loaded", &[&self.db.cards.len()]);
+                    loaded = true;
                     finished = true;
                 }
                 DbMsg::UpToDate => {
@@ -300,6 +315,45 @@ impl ComboApp {
         if finished {
             self.db_rx = None;
         }
+        if loaded {
+            self.rebuild_ban_index();
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Bannlisten (bei jedem Start im Hintergrund neu geladen)
+    // -----------------------------------------------------------------------
+
+    fn start_banlist_job(&mut self, ctx: egui::Context) {
+        let (tx, rx) = channel();
+        self.ban_rx = Some(rx);
+        let dir = self.paths.cache_dir.clone();
+        std::thread::spawn(move || {
+            let r = crate::banlist::Banlists::fetch(&dir).map_err(|e| format!("{e:#}"));
+            let _ = tx.send(r);
+            ctx.request_repaint();
+        });
+    }
+
+    fn poll_banlist(&mut self) {
+        if let Some(rx) = &self.ban_rx
+            && let Ok(result) = rx.try_recv()
+        {
+            self.ban_rx = None;
+            // Ohne Internet bleiben die zuletzt gespeicherten Listen in Gebrauch.
+            if let Ok(lists) = result {
+                self.banlists = lists;
+                self.rebuild_ban_index();
+            }
+        }
+        if self.ban_format != self.settings.format {
+            self.rebuild_ban_index();
+        }
+    }
+
+    fn rebuild_ban_index(&mut self) {
+        self.ban_format = self.settings.format;
+        self.ban_index = self.banlists.index(self.ban_format, &self.db);
     }
 
     fn db_busy(&self) -> bool {
@@ -496,6 +550,7 @@ impl eframe::App for ComboApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.poll_db();
+        self.poll_banlist();
         self.images.poll(&ctx);
 
         egui::Panel::top("top_bar")
@@ -601,6 +656,21 @@ impl ComboApp {
         )
         .on_disabled_hover_text(tr("settings.localized_names_unavailable"));
         ui.separator();
+        ui.horizontal(|ui| {
+            ui.label(tr("settings.format"));
+            for f in crate::banlist::Format::ALL {
+                ui.selectable_value(&mut self.settings.format, f, f.label());
+            }
+        })
+        .response
+        .on_hover_text(tr("settings.format_hint"));
+        ui.label(
+            RichText::new(match self.banlists.date(self.settings.format) {
+                Some(date) => trf("ban.list_date", &[&date]),
+                None => tr("ban.not_loaded").to_string(),
+            })
+            .weak(),
+        );
         ui.checkbox(&mut self.settings.md_only, tr("settings.md_only"));
         ui.add(
             egui::Slider::new(&mut self.settings.card_width, 48.0..=280.0)

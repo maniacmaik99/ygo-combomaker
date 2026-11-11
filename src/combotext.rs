@@ -636,6 +636,7 @@ mod tests {
             desc: String::new(),
             in_master_duel: true,
             alt_ids: Vec::new(),
+            konami_id: None,
         }
     }
 

@@ -38,6 +38,9 @@ pub struct Card {
     /// IDs alternativer Artworks. Decklisten (YDK) enthalten manchmal diese IDs.
     #[serde(default)]
     pub alt_ids: Vec<u32>,
+    /// Nummer der Karte in Konamis Kartendatenbank. Die Bannlisten benutzen sie.
+    #[serde(default)]
+    pub konami_id: Option<u32>,
 }
 
 impl Card {
@@ -241,6 +244,8 @@ struct ApiImage {
 struct ApiMisc {
     #[serde(default)]
     formats: Vec<String>,
+    #[serde(default)]
+    konami_id: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -282,6 +287,7 @@ pub fn parse_api_cards(json: &[u8]) -> Result<Vec<Card>> {
                 desc: c.desc,
                 in_master_duel: in_md,
                 alt_ids: c.card_images.iter().skip(1).map(|i| i.id).collect(),
+                konami_id: c.misc_info.iter().find_map(|m| m.konami_id),
             }
         })
         .collect())
@@ -293,7 +299,7 @@ pub fn parse_api_names(json: &[u8]) -> Result<Vec<(u32, String)>> {
     Ok(resp.data.into_iter().map(|c| (c.id, c.name)).collect())
 }
 
-fn http_get(url: &str) -> Result<Vec<u8>> {
+pub(crate) fn http_get(url: &str) -> Result<Vec<u8>> {
     let mut resp = ureq::get(url)
         .header("User-Agent", USER_AGENT)
         .call()
@@ -358,7 +364,7 @@ mod tests {
        "attribute":"DARK","archetype":"Dark Magician",
        "card_images":[{"id":46986414,"image_url":"x","image_url_small":"y","image_url_cropped":"z"},
                       {"id":36996508,"image_url":"x","image_url_small":"y","image_url_cropped":"z"}],
-       "misc_info":[{"formats":["TCG","OCG","Master Duel"],"md_rarity":"UR"}]},
+       "misc_info":[{"formats":["TCG","OCG","Master Duel"],"md_rarity":"UR","konami_id":4007}]},
       {"id":24094653,"name":"Polymerization","type":"Spell Card","frameType":"spell",
        "desc":"Fusion Summon.","race":"Normal",
        "card_images":[{"id":24094653}],"misc_info":[{"formats":["TCG"]}]},
@@ -371,6 +377,8 @@ mod tests {
         assert_eq!(cards.len(), 3);
         assert_eq!(cards[0].kind, CardKind::Monster);
         assert!(cards[0].in_master_duel);
+        assert_eq!(cards[0].konami_id, Some(4007));
+        assert_eq!(cards[1].konami_id, None);
         assert_eq!(cards[0].image_id, 46986414);
         assert_eq!(cards[1].kind, CardKind::Spell);
         assert!(!cards[1].in_master_duel);

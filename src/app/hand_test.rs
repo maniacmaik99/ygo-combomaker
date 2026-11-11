@@ -289,6 +289,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let auto_zone = self.settings.auto_zone;
         let Some(play) = self.hand_test.play.as_mut() else {
@@ -468,6 +469,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let mut jump = None;
         let mut start_play = false;

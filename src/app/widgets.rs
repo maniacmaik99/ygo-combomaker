@@ -19,6 +19,8 @@ pub struct View<'a> {
     pub db: &'a CardDb,
     /// Sprachcode für Kartennamen, `None` = Englisch.
     pub name_lang: Option<&'static str>,
+    /// Karten mit Beschränkung in der gewählten Spielversion (nach Karten-ID).
+    pub ban: &'a std::collections::HashMap<u32, crate::banlist::Limit>,
 }
 
 /// Markierungen, die auf eine Karte gezeichnet werden.
@@ -155,6 +157,7 @@ pub fn card_widget_sense(
 ) -> egui::Response {
     let size = Vec2::new(width, width * CARD_RATIO);
     let (rect, resp) = ui.allocate_exact_size(size, sense);
+    let limit = slot.card_id().and_then(|id| v.ban.get(&id)).copied();
     if ui.is_rect_visible(rect) {
         let painter = ui.painter();
         let small = FontId::proportional((width / 6.0).clamp(9.0, 14.0));
@@ -217,6 +220,9 @@ pub fn card_widget_sense(
                 Color32::from_rgba_unmultiplied(40, 30, 110, 235),
             );
         }
+        if let Some(limit) = limit {
+            ban_badge(painter, rect, width, limit);
+        }
         if let Some(color) = highlight {
             painter.rect_stroke(rect, 5.0, Stroke::new(3.0, color), StrokeKind::Outside);
         } else if resp.hovered() {
@@ -237,6 +243,13 @@ pub fn card_widget_sense(
                 ui.label(RichText::new(&card.name).weak());
             }
             ui.label(RichText::new(&card.type_line).italics());
+            if let Some(limit) = limit {
+                ui.label(
+                    RichText::new(limit.label())
+                        .color(ban_color(limit))
+                        .strong(),
+                );
+            }
             ui.label(&card.desc);
         }
         if marks.action != Action::None {
@@ -340,4 +353,39 @@ pub fn action_combo(ui: &mut egui::Ui, id: &str, action: &mut Action) -> bool {
         });
     }
     changed
+}
+
+/// Farbe einer Beschränkung: verboten rot, limitiert orange, halb-limitiert gelb.
+pub fn ban_color(limit: crate::banlist::Limit) -> Color32 {
+    use crate::banlist::Limit;
+    match limit {
+        Limit::Forbidden => Color32::from_rgb(214, 48, 49),
+        Limit::Limited => Color32::from_rgb(235, 130, 30),
+        Limit::SemiLimited => Color32::from_rgb(235, 200, 40),
+    }
+}
+
+/// Runde Marke oben links auf der Karte: Verbotszeichen, 1 oder 2.
+fn ban_badge(painter: &egui::Painter, rect: Rect, width: f32, limit: crate::banlist::Limit) {
+    use crate::banlist::Limit;
+    let r = (width / 6.5).clamp(7.0, 16.0);
+    let c = rect.left_top() + Vec2::splat(r + 2.0);
+    painter.circle_filled(c, r + 1.5, Color32::from_black_alpha(230));
+    painter.circle_filled(c, r, ban_color(limit));
+    match limit {
+        Limit::Forbidden => {
+            painter.circle_filled(c, r * 0.62, Color32::from_black_alpha(230));
+            let d = Vec2::splat(r * 0.6);
+            painter.line_segment([c - d, c + d], Stroke::new(r * 0.38, ban_color(limit)));
+        }
+        _ => {
+            painter.text(
+                c,
+                Align2::CENTER_CENTER,
+                limit.max_copies().to_string(),
+                FontId::proportional(r * 1.5),
+                Color32::BLACK,
+            );
+        }
+    }
 }

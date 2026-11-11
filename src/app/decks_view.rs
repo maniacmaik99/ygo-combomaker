@@ -53,6 +53,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let mut changed = false;
         let mut remove_one = None;
@@ -85,6 +86,54 @@ impl ComboApp {
                     self.confirm_delete_deck = Some(di);
                 }
             });
+
+            // Bannliste der gewählten Spielversion: zu viele Kopien melden.
+            let format = self.settings.format;
+            match self.banlists.date(format) {
+                None => {
+                    ui.label(
+                        RichText::new(format!("{}: {}", format.label(), tr("ban.not_loaded")))
+                            .weak(),
+                    );
+                }
+                Some(date) => {
+                    let over: Vec<_> = deck
+                        .cards
+                        .iter()
+                        .filter_map(|c| {
+                            let limit = *self.ban_index.get(&c.id)?;
+                            (c.count > limit.max_copies()).then_some((c, limit))
+                        })
+                        .collect();
+                    let head = format!("{} ({})", format.label(), trf("ban.list_date", &[&date]));
+                    if over.is_empty() {
+                        ui.label(
+                            RichText::new(format!("{head}: {}", tr("ban.deck_ok")))
+                                .color(super::widgets::GOOD_COLOR),
+                        );
+                    } else {
+                        ui.label(
+                            RichText::new(format!(
+                                "{head}: {}",
+                                trf("ban.deck_bad", &[&over.len()])
+                            ))
+                            .color(super::widgets::BAD_COLOR)
+                            .strong(),
+                        );
+                        for (c, limit) in over {
+                            let name = self
+                                .db
+                                .get(c.id)
+                                .map(|x| x.localized_name(v.name_lang))
+                                .unwrap_or(&c.name);
+                            ui.label(trf(
+                                "ban.deck_line",
+                                &[&name, &limit.label(), &c.count, &limit.max_copies()],
+                            ));
+                        }
+                    }
+                }
+            }
 
             ui.add_space(6.0);
             ui.label(RichText::new(tr("deck.archetype_title")).strong());
@@ -134,7 +183,13 @@ impl ComboApp {
                         if r.secondary_clicked() {
                             add_one = Some(c.clone());
                         }
-                        ui.label(RichText::new(format!("{}×", c.count)).strong());
+                        let over = v.ban.get(&c.id).is_some_and(|l| c.count > l.max_copies());
+                        let count = RichText::new(format!("{}×", c.count)).strong();
+                        ui.label(if over {
+                            count.color(super::widgets::BAD_COLOR)
+                        } else {
+                            count
+                        });
                     });
                 }
             });

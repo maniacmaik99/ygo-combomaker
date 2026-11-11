@@ -61,6 +61,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let combo = &self.combos[idx];
         let p = self.practice.as_mut().expect("practice");
@@ -221,6 +222,7 @@ impl ComboApp {
                 CardView {
                     db: &self.db,
                     name_lang,
+                    ban: &self.ban_index,
                 },
                 &slot,
             );
@@ -239,6 +241,7 @@ impl ComboApp {
                     CardView {
                         db,
                         name_lang: None,
+                        ban: &self.ban_index,
                     },
                     &mv.slot,
                 );

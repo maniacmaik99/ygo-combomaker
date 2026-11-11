@@ -285,6 +285,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let rec = self.recorder.as_mut().expect("recorder");
         let event = rec.field.show(
@@ -361,6 +362,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let combo = &self.combos[idx];
         if combo.steps.iter().all(|s| s.parts.is_empty()) {
@@ -425,6 +427,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let mut clicked = None;
         let mut open_picker = false;
@@ -468,6 +471,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let mut op = None;
         let mut note_changed = false;
@@ -591,6 +595,7 @@ impl ComboApp {
         let v = CardView {
             db: &self.db,
             name_lang: self.name_lang(),
+            ban: &self.ban_index,
         };
         let combo = &mut self.combos[idx];
         let (entry, connector, len, pos) = match sel {

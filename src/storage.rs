@@ -55,6 +55,8 @@ pub struct Settings {
     pub localized_card_names: bool,
     /// In der Suche nur Karten zeigen, die es in Master Duel gibt.
     pub md_only: bool,
+    /// Spielversion, deren Bannliste angezeigt wird.
+    pub format: crate::banlist::Format,
     /// Kartenbreite in Pixeln im Editor.
     pub card_width: f32,
     /// Beim Start automatisch nach Updates suchen.
@@ -74,6 +76,7 @@ impl Default for Settings {
             lang: None,
             localized_card_names: false,
             md_only: true,
+            format: Default::default(),
             card_width: 72.0,
             picker_card_width: 64.0,
             auto_update_check: true,
