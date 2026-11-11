@@ -716,15 +716,21 @@ impl ComboApp {
         let mut do_import = false;
         egui::Window::new(tr("combo.import_title"))
             .open(&mut open)
+            .default_width(540.0)
             .show(ctx, |ui| {
-                ui.label(tr("combo.import_paste"));
+                let max_h = (ui.ctx().content_rect().height() - 140.0).max(240.0);
                 egui::ScrollArea::vertical()
-                    .max_height(300.0)
+                    .id_salt("import_window_scroll")
+                    .max_height(max_h)
                     .show(ui, |ui| {
+                        ui.label(tr("combo.import_paste"));
+                        egui::CollapsingHeader::new(tr("textimport.header"))
+                            .id_salt("textimport_help")
+                            .show(ui, text_format_help);
                         ui.add(
                             TextEdit::multiline(text)
                                 .desired_rows(10)
-                                .desired_width(400.0)
+                                .desired_width(f32::INFINITY)
                                 .code_editor(),
                         );
                     });
@@ -733,15 +739,41 @@ impl ComboApp {
                 }
             });
         if do_import {
-            match storage::combo_from_share_text(text) {
-                Ok(c) => {
-                    self.combos.push(c);
+            if text.trim_start().starts_with('{') {
+                // Geteilte Combo (JSON).
+                match storage::combo_from_share_text(text) {
+                    Ok(c) => {
+                        self.combos.push(c);
+                        self.select_combo(Some(self.combos.len() - 1));
+                        self.view = View::Edit;
+                        self.mark_dirty();
+                        self.import_text = None;
+                    }
+                    Err(e) => self.message = Some(trf("msg.import_failed", &[&format!("{e:#}")])),
+                }
+            } else if self.db.is_empty() {
+                self.message = Some(tr("textimport.no_db").into());
+            } else {
+                // Textformat (experimentell).
+                let parsed = crate::combotext::parse(text, &self.db, &self.decks);
+                if parsed.combos.is_empty() || parsed.combos.iter().all(|c| c.steps.is_empty()) {
+                    let mut msg = tr("textimport.empty").to_string();
+                    if !parsed.problems.is_empty() {
+                        msg.push_str("\n\n");
+                        msg.push_str(tr("textimport.problems"));
+                        for p in parsed.problems.iter().take(25) {
+                            msg.push_str(&format!("\n  {p}"));
+                        }
+                    }
+                    self.message = Some(msg);
+                } else {
+                    self.message = Some(parsed.summary());
+                    self.combos.extend(parsed.combos);
                     self.select_combo(Some(self.combos.len() - 1));
                     self.view = View::Edit;
                     self.mark_dirty();
                     self.import_text = None;
                 }
-                Err(e) => self.message = Some(trf("msg.import_failed", &[&format!("{e:#}")])),
             }
         }
         if !open {
@@ -796,7 +828,9 @@ impl ComboApp {
             .collapsible(false)
             .anchor(Align2::CENTER_TOP, [0.0, 60.0])
             .show(ctx, |ui| {
-                ui.label(msg);
+                egui::ScrollArea::vertical()
+                    .max_height(420.0)
+                    .show(ui, |ui| ui.label(msg));
                 if ui.button(tr("common.ok")).clicked() {
                     close = true;
                 }
@@ -805,4 +839,51 @@ impl ComboApp {
             self.message = None;
         }
     }
+}
+
+/// Aufklappbare Hilfe zum Textformat: Regeln, Beispiel, Schlüsselwörter, Zonen.
+fn text_format_help(ui: &mut egui::Ui) {
+    use crate::combotext::{EXAMPLE, KEYWORDS, ZONE_TAGS};
+    ui.label(tr("textimport.intro"));
+    ui.add_space(4.0);
+    ui.label(tr("textimport.rules"));
+    ui.add_space(6.0);
+    ui.label(RichText::new(tr("textimport.example")).strong());
+    ui.label(RichText::new(EXAMPLE).monospace());
+    ui.add_space(6.0);
+    ui.label(RichText::new(tr("textimport.keywords")).strong());
+    egui::Grid::new("textimport_keywords")
+        .num_columns(2)
+        .spacing([16.0, 2.0])
+        .show(ui, |ui| {
+            // Alle Schlüsselwörter einer Aktion in einer Zeile.
+            let mut seen: Vec<crate::model::Action> = Vec::new();
+            for (_, action) in KEYWORDS {
+                if seen.contains(action) {
+                    continue;
+                }
+                seen.push(*action);
+                let words: Vec<&str> = KEYWORDS
+                    .iter()
+                    .filter(|(_, a)| a == action)
+                    .map(|(k, _)| *k)
+                    .collect();
+                ui.label(RichText::new(words.join(", ")).monospace());
+                ui.label(action.label());
+                ui.end_row();
+            }
+        });
+    ui.label(tr("textimport.chain"));
+    ui.add_space(6.0);
+    ui.label(RichText::new(tr("textimport.zones")).strong());
+    egui::Grid::new("textimport_zones")
+        .num_columns(2)
+        .spacing([16.0, 2.0])
+        .show(ui, |ui| {
+            for (tag, zone) in ZONE_TAGS {
+                ui.label(RichText::new(format!("[{tag}]")).monospace());
+                ui.label(zone.label());
+                ui.end_row();
+            }
+        });
 }

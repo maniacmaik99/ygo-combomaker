@@ -157,7 +157,7 @@ pub const T: &[(&str, &str)] = &[
     ("combo.import_title", "Combo importieren"),
     (
         "combo.import_paste",
-        "Füge hier den kopierten Combo-Text ein (Strg+V):",
+        "Füge hier eine geteilte Combo oder eine als Text geschriebene Combo ein (Strg+V):",
     ),
     ("combo.delete_title", "Combo löschen?"),
     ("combo.delete_text", "„{0}“ wird endgültig gelöscht."),
@@ -601,6 +601,50 @@ pub const T: &[(&str, &str)] = &[
     (
         "update.err.not_writable",
         "Das Programm liegt in {0} und kann sich dort nicht selbst ersetzen (aus einem Paket installiert). Lade bitte das neue Paket von der GitHub-Release-Seite herunter und installiere es.",
+    ),
+    (
+        "textimport.header",
+        "Combo als Text schreiben (experimentell) – Syntax anzeigen",
+    ),
+    (
+        "textimport.intro",
+        "Experimentell. Statt einer geteilten Combo kannst du eine Combo als einfachen Text einfügen. Kartennamen dürfen gekürzt sein; die App sucht sie in der Kartendatenbank. Bitte prüfe das Ergebnis nach dem Import.",
+    ),
+    (
+        "textimport.rules",
+        "1. „# Titel“ beginnt eine Combo. Ein Text darf mehrere Combos enthalten.\n2. Optionale Zeilen: „deck:“, „author:“, „hand:“, „end:“, „through:“ (Handtraps, durch die die Combo spielt), „note:“. Karten mit „+“ trennen. „any“ steht für eine beliebige Karte.\n3. Jede andere Zeile ist ein Zug: Schlüsselwort, dann Kartenname. Mehrere Züge in einer Zeile mit „ > “ trennen.\n4. Eine leere Zeile beginnt einen neuen Schritt.\n5. „[zone]“ am Ende eines Zugs wählt eine Zone. „// Text“ fügt dem Zug eine Notiz hinzu.\n6. Ohne „end:“ nimmt die App die Karten, die am Ende auf dem Feld liegen, als Endboard.",
+    ),
+    ("textimport.example", "Beispiel"),
+    ("textimport.keywords", "Schlüsselwörter"),
+    ("textimport.zones", "Zonen"),
+    (
+        "textimport.chain",
+        "cl1, cl2, … = Kettenglied mit dieser Nummer",
+    ),
+    ("textimport.result", "Importierte Combos: {0}"),
+    ("textimport.assumed", "Ergänzte Kartennamen (bitte prüfen):"),
+    (
+        "textimport.not_found",
+        "Nicht gefundene Karten (als Platzhalter eingefügt):",
+    ),
+    ("textimport.problems", "Zeilen mit Problemen:"),
+    ("textimport.line", "Zeile {0}: {1}"),
+    (
+        "textimport.unknown_keyword",
+        "unbekanntes Schlüsselwort „{0}“",
+    ),
+    ("textimport.unknown_zone", "unbekannte Zone „{0}“"),
+    ("textimport.no_card", "Kartenname fehlt"),
+    ("textimport.empty", "Im Text wurde keine Combo gefunden."),
+    (
+        "textimport.no_db",
+        "Die Kartendatenbank ist noch nicht geladen. Bitte zuerst „Karten aktualisieren“ anklicken.",
+    ),
+    ("textimport.default_title", "Importierte Combo"),
+    ("textimport.copy", "Als Text kopieren"),
+    (
+        "textimport.copy_hint",
+        "Experimentell: kopiert die Combo im Textformat. Der Text lässt sich bearbeiten und wieder importieren.",
     ),
     ("settings.auto_zone", "Spielfeld: Zone automatisch wählen"),
     (

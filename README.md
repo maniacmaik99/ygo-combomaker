@@ -31,6 +31,7 @@ Die Bildschirmfotos zeigen Platzhalterkarten. In der App erscheinen die echten K
 - **Üben:** Die Combo Zug für Zug nachspielen. Die App zeigt nach jedem Zug, ob er richtig war.
 - **Handtest:** Starthände aus einer Deckliste ziehen, frei ausspielen und 1000 Hände simulieren.
 - **Decklisten:** aus einem Archetyp füllen oder importieren (ydke-Link, YDK-Datei, Kartenliste).
+- **Combo als Text (experimentell):** Combo in Kurzschrift tippen oder einfügen, die App sucht die Karten selbst.
 - **Update-Knopf:** Die App aktualisiert sich selbst über GitHub Releases.
 
 ## Installieren
@@ -82,6 +83,60 @@ chmod +x ygo-combomaker-linux-x86_64
 
 Der Update-Knopf ersetzt die Programmdatei. Das geht nur, wenn dein Benutzer die Datei ändern darf. Bei der Installation mit `install.sh`, ohne Installation und unter Windows funktioniert er. Nach der Installation als `.deb` oder `.rpm` liegt das Programm in `/usr/bin`; dann zeigt die App einen Hinweis, und du installierst die neue Paketdatei von der Release-Seite.
 
+## Combo als Text schreiben (experimentell)
+
+Statt die Combo auf dem Spielfeld zu klicken, kannst du sie als Text schreiben und über „Importieren“ einfügen. Die Funktion ist experimentell: Prüfe das Ergebnis nach dem Import. Die App zeigt nach dem Import, welche Kartennamen sie ergänzt hat, welche Karten sie nicht gefunden hat und welche Zeilen Probleme machen. Dieselbe Anleitung steht in der App im Fenster „Combo importieren“ zum Aufklappen.
+
+```text
+# Gold Leo combo
+deck: Lunalight
+hand: Gold Leo + any
+
+ns Gold Leo
+eff Gold Leo > send Yellow Marten
+
+eff Yellow Marten > search Kaleido Chick // from the graveyard
+cl2 Kaleido Chick > send Wolf
+scale Wolf [pl]
+fusion Liger Dancer [emz]
+
+end: Liger Dancer
+```
+
+Regeln:
+
+1. `# Titel` beginnt eine Combo. Ein Text darf mehrere Combos enthalten.
+2. Optionale Zeilen: `deck:`, `author:`, `hand:` (Starthand), `end:` (Endboard), `through:` (Handtraps, durch die die Combo spielt), `note:`. Karten mit `+` trennen. `any` steht für eine beliebige Karte.
+3. Jede andere Zeile ist ein Zug: Schlüsselwort, dann Kartenname. Mehrere Züge in einer Zeile mit ` > ` trennen.
+4. Eine leere Zeile beginnt einen neuen Schritt.
+5. `[zone]` am Ende eines Zugs wählt eine Zone. `// Text` fügt dem Zug eine Notiz hinzu.
+6. Ohne `end:` nimmt die App die Karten, die am Ende auf dem Feld liegen, als Endboard.
+
+Kartennamen dürfen gekürzt sein (`Gold Leo` statt `Lunalight Gold Leo`). Bei mehreren Treffern gewinnt die Karte aus der Deckliste oder dem Archetyp, der bei `deck:` steht. Kleine Tippfehler werden korrigiert.
+
+| Schlüsselwort | Aktion |
+|---|---|
+| `ns`, `normal` | Normalbeschwörung |
+| `ss`, `special` | Spezialbeschwörung |
+| `ts` | Tributbeschwörung |
+| `set` | Setzen (Monster verdeckt; Zauber/Falle setzen) |
+| `flip` | Flippbeschwörung |
+| `fusion`, `ritual`, `synchro`, `xyz`, `pendulum`, `link` | Beschwörung dieser Art |
+| `act`, `activate`, `eff`, `effect` | Effekt aktivieren |
+| `cl1`, `cl2`, … | Kettenglied mit dieser Nummer |
+| `scale` | in die Pendelzone legen |
+| `setst`, `place`, `equip` | Zauber/Falle setzen, offen auf das Feld legen, ausrüsten |
+| `tribute`, `mat`, `attach`, `detach`, `discard` | Tribut, Material, Xyz-Material an-/abhängen, abwerfen |
+| `search`, `add` | Suchen (auf die Hand; mit `[gy]` auf den Friedhof) |
+| `draw`, `send`, `mill`, `banish`, `destroy`, `bounce` | Ziehen, auf den Friedhof, Verbannen, Zerstören, zurück auf die Hand |
+| `gytohand`, `gytodeck`, `banishedtohand`, `banishedtogy` | Friedhof → Hand/Deck, verbannt → Hand/Friedhof |
+| `todeck`, `toextra` | zurück ins Deck / Extra Deck |
+| `reveal`, `negate`, `target`, `pos` | Aufdecken, Annullieren, Ziel wählen, Kampfposition ändern |
+
+Zonen: `[mz]` Monsterzone, `[emz]` Extra-Monsterzone, `[st]` Zauber-/Fallenzone, `[pl]` / `[pr]` Pendelzone links / rechts, `[field]` Feldzauberzone, `[hand]`, `[gy]`.
+
+„Als Text kopieren“ in den Combo-Details schreibt eine vorhandene Combo in diesem Format.
+
 ## Datenquelle
 
 Kartennamen, Kartentexte und Bilder kommen von der freien **YGOPRODeck-API** (https://ygoprodeck.com/api-guide/).
@@ -124,7 +179,7 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | Combos, Einstellungen | `~/.local/share/ygo-combomaker/` | `%APPDATA%\ygo-combomaker\data\` |
 | Kartendatenbank, Bilder | `~/.cache/ygo-combomaker/` | `%LOCALAPPDATA%\ygo-combomaker\cache\` |
 
-## Funktionen (Stand 0.7)
+## Funktionen (Stand 0.8)
 
 - **Sprachen:** Englisch, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch (Einstellungen → Sprache). Kartennamen optional in der gewählten Sprache (außer Spanisch, das bietet die Kartendatenbank nicht an).
 - **Bedienung wie im Spiel:** Karte anklicken → direkt an der Karte erscheint ein Menü mit den Aktionen, die an diesem Ort üblich sind (z. B. Hand: Normalbeschwörung, Spezialbeschwörung, Setzen, Effekt aktivieren). Oder die Karte mit der Maus auf eine Zone, den Friedhof, den Verbannt-Stapel oder die Hand ziehen. Deck und Extra Deck sind Stapel auf dem Feld. Esc oder Rechtsklick bricht ab, Strg+Z macht den letzten aufgenommenen Zug rückgängig. Optional wählt die App freie Zonen automatisch (Einstellungen).
@@ -152,6 +207,7 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | `src/storage.rs` | Speicherorte, Laden/Speichern, Teilen |
 | `src/board.rs` | Spielfeld-Logik: Zonen, Züge, Ziel jeder Aktion |
 | `src/practice.rs` | Logik des Übungsmodus (Züge prüfen) |
+| `src/combotext.rs` | Textformat für Combos (experimentell): Lesen und Schreiben |
 | `src/updater.rs` | Update über GitHub Releases |
 | `src/i18n/` | Übersetzungen (eine Datei pro Sprache) |
 | `src/theme.rs` | Farben und Stil der Oberfläche |

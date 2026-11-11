@@ -169,7 +169,7 @@ pub const T: &[(&str, &str)] = &[
     ("combo.import_title", "Importar combo"),
     (
         "combo.import_paste",
-        "Cole aqui o texto do combo copiado (Ctrl+V):",
+        "Cole aqui um combo compartilhado ou um combo escrito como texto (Ctrl+V):",
     ),
     ("combo.delete_title", "Excluir o combo?"),
     ("combo.delete_text", "“{0}” será excluído permanentemente."),
@@ -625,6 +625,53 @@ pub const T: &[(&str, &str)] = &[
     (
         "update.err.not_writable",
         "O programa está instalado em {0}, onde não pode substituir a si mesmo (instalado por um pacote). Baixe o novo pacote na página de releases do GitHub e instale-o.",
+    ),
+    (
+        "textimport.header",
+        "Escrever um combo como texto (experimental) – mostrar a sintaxe",
+    ),
+    (
+        "textimport.intro",
+        "Experimental. Em vez de um combo compartilhado, você pode colar um combo escrito como texto simples. Os nomes das cartas podem ser abreviados; o aplicativo os procura no banco de dados de cartas. Confira o resultado depois de importar.",
+    ),
+    (
+        "textimport.rules",
+        "1. \"# Título\" inicia um combo. Um texto pode conter vários combos.\n2. Linhas opcionais: \"deck:\", \"author:\", \"hand:\", \"end:\", \"through:\" (hand traps que o combo supera), \"note:\". Separe as cartas com \"+\". \"any\" significa qualquer carta.\n3. Cada outra linha é uma jogada: palavra-chave e depois o nome da carta. Várias jogadas em uma linha: separe-as com \" > \".\n4. Uma linha vazia inicia um novo passo.\n5. \"[zona]\" no fim de uma jogada escolhe uma zona. \"// texto\" adiciona uma nota à jogada.\n6. Sem \"end:\", o aplicativo usa as cartas que ficaram no campo como campo final.",
+    ),
+    ("textimport.example", "Exemplo"),
+    ("textimport.keywords", "Palavras-chave"),
+    ("textimport.zones", "Zonas"),
+    (
+        "textimport.chain",
+        "cl1, cl2, … = elo da corrente com este número",
+    ),
+    ("textimport.result", "Combos importados: {0}"),
+    (
+        "textimport.assumed",
+        "Nomes de cartas completados (confira):",
+    ),
+    (
+        "textimport.not_found",
+        "Cartas não encontradas (inseridas como marcadores):",
+    ),
+    ("textimport.problems", "Linhas com problemas:"),
+    ("textimport.line", "Linha {0}: {1}"),
+    (
+        "textimport.unknown_keyword",
+        "palavra-chave desconhecida \"{0}\"",
+    ),
+    ("textimport.unknown_zone", "zona desconhecida \"{0}\""),
+    ("textimport.no_card", "falta o nome da carta"),
+    ("textimport.empty", "Nenhum combo encontrado no texto."),
+    (
+        "textimport.no_db",
+        "O banco de dados de cartas ainda não foi carregado. Clique primeiro em \"Atualizar cartas\".",
+    ),
+    ("textimport.default_title", "Combo importado"),
+    ("textimport.copy", "Copiar como texto"),
+    (
+        "textimport.copy_hint",
+        "Experimental: copia o combo no formato de texto. O texto pode ser editado e importado de novo.",
     ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (

@@ -142,7 +142,7 @@ pub const T: &[(&str, &str)] = &[
     ("combo.import_title", "Import combo"),
     (
         "combo.import_paste",
-        "Paste the copied combo text here (Ctrl+V):",
+        "Paste a shared combo or a combo written as text here (Ctrl+V):",
     ),
     ("combo.delete_title", "Delete combo?"),
     ("combo.delete_text", "\"{0}\" will be deleted permanently."),
@@ -571,6 +571,47 @@ pub const T: &[(&str, &str)] = &[
     (
         "update.err.not_writable",
         "The program is installed in {0}, where it cannot replace itself (installed from a package). Please download the new package from the GitHub releases page and install it.",
+    ),
+    (
+        "textimport.header",
+        "Write a combo as text (experimental) – show syntax",
+    ),
+    (
+        "textimport.intro",
+        "Experimental. Instead of a shared combo you can paste a combo written as plain text. Card names may be shortened; the app looks them up in the card database. Please check the result after importing.",
+    ),
+    (
+        "textimport.rules",
+        "1. \"# Title\" starts a combo. One text may contain several combos.\n2. Optional lines: \"deck:\", \"author:\", \"hand:\", \"end:\", \"through:\" (hand traps the combo plays through), \"note:\". Separate cards with \"+\". \"any\" stands for any card.\n3. Every other line is one move: keyword, then card name. Several moves in one line: separate them with \" > \".\n4. An empty line starts a new step.\n5. \"[zone]\" at the end of a move picks a zone. \"// text\" adds a note to the move.\n6. Without \"end:\" the app uses the cards left on the board as the end board.",
+    ),
+    ("textimport.example", "Example"),
+    ("textimport.keywords", "Keywords"),
+    ("textimport.zones", "Zones"),
+    (
+        "textimport.chain",
+        "cl1, cl2, … = chain link with this number",
+    ),
+    ("textimport.result", "Combos imported: {0}"),
+    ("textimport.assumed", "Card names completed (please check):"),
+    (
+        "textimport.not_found",
+        "Cards not found (inserted as placeholders):",
+    ),
+    ("textimport.problems", "Lines with problems:"),
+    ("textimport.line", "Line {0}: {1}"),
+    ("textimport.unknown_keyword", "unknown keyword \"{0}\""),
+    ("textimport.unknown_zone", "unknown zone \"{0}\""),
+    ("textimport.no_card", "card name is missing"),
+    ("textimport.empty", "No combo found in the text."),
+    (
+        "textimport.no_db",
+        "The card database is not loaded yet. Please click \"Update cards\" first.",
+    ),
+    ("textimport.default_title", "Imported combo"),
+    ("textimport.copy", "Copy as text"),
+    (
+        "textimport.copy_hint",
+        "Experimental: copies the combo in the text format. It can be edited and imported again.",
     ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (

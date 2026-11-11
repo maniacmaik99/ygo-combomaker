@@ -160,7 +160,7 @@ pub const T: &[(&str, &str)] = &[
     ("combo.import_title", "Importa combo"),
     (
         "combo.import_paste",
-        "Incolla qui il testo della combo copiata (Ctrl+V):",
+        "Incolla qui una combo condivisa o una combo scritta come testo (Ctrl+V):",
     ),
     ("combo.delete_title", "Eliminare la combo?"),
     (
@@ -625,6 +625,53 @@ pub const T: &[(&str, &str)] = &[
     (
         "update.err.not_writable",
         "Il programma è installato in {0}, dove non può sostituire se stesso (installato da un pacchetto). Scarica il nuovo pacchetto dalla pagina delle release di GitHub e installalo.",
+    ),
+    (
+        "textimport.header",
+        "Scrivere una combo come testo (sperimentale) – mostra la sintassi",
+    ),
+    (
+        "textimport.intro",
+        "Sperimentale. Invece di una combo condivisa puoi incollare una combo scritta come testo semplice. I nomi delle carte possono essere abbreviati; l’app li cerca nel database delle carte. Controlla il risultato dopo l’importazione.",
+    ),
+    (
+        "textimport.rules",
+        "1. «# Titolo» inizia una combo. Un testo può contenere più combo.\n2. Righe facoltative: «deck:», «author:», «hand:», «end:», «through:» (hand trap che la combo supera), «note:». Separa le carte con «+». «any» indica una carta qualsiasi.\n3. Ogni altra riga è una mossa: parola chiave, poi nome della carta. Più mosse in una riga: separale con « > ».\n4. Una riga vuota inizia un nuovo passo.\n5. «[zona]» alla fine di una mossa sceglie una zona. «// testo» aggiunge una nota alla mossa.\n6. Senza «end:» l’app usa le carte rimaste sul terreno come terreno finale.",
+    ),
+    ("textimport.example", "Esempio"),
+    ("textimport.keywords", "Parole chiave"),
+    ("textimport.zones", "Zone"),
+    (
+        "textimport.chain",
+        "cl1, cl2, … = anello della catena con questo numero",
+    ),
+    ("textimport.result", "Combo importate: {0}"),
+    (
+        "textimport.assumed",
+        "Nomi delle carte completati (da controllare):",
+    ),
+    (
+        "textimport.not_found",
+        "Carte non trovate (inserite come segnaposto):",
+    ),
+    ("textimport.problems", "Righe con problemi:"),
+    ("textimport.line", "Riga {0}: {1}"),
+    (
+        "textimport.unknown_keyword",
+        "parola chiave sconosciuta «{0}»",
+    ),
+    ("textimport.unknown_zone", "zona sconosciuta «{0}»"),
+    ("textimport.no_card", "manca il nome della carta"),
+    ("textimport.empty", "Nessuna combo trovata nel testo."),
+    (
+        "textimport.no_db",
+        "Il database delle carte non è ancora caricato. Clicca prima su «Aggiorna carte».",
+    ),
+    ("textimport.default_title", "Combo importata"),
+    ("textimport.copy", "Copia come testo"),
+    (
+        "textimport.copy_hint",
+        "Sperimentale: copia la combo nel formato testo. Il testo può essere modificato e importato di nuovo.",
     ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (

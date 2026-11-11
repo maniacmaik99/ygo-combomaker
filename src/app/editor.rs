@@ -153,6 +153,15 @@ impl ComboApp {
                 ui.ctx().copy_text(text);
                 self.message = Some(tr("msg.combo_copied").into());
             }
+            if ui
+                .button(tr("textimport.copy"))
+                .on_hover_text(tr("textimport.copy_hint"))
+                .clicked()
+            {
+                ui.ctx()
+                    .copy_text(crate::combotext::to_text(&self.combos[idx]));
+                self.message = Some(tr("msg.combo_copied").into());
+            }
         });
     }
 

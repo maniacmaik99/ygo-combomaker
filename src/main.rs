@@ -7,6 +7,7 @@
 mod app;
 mod board;
 mod cards;
+mod combotext;
 mod decks;
 mod i18n;
 mod images;
