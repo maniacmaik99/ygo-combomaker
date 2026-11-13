@@ -71,10 +71,26 @@ pub fn draw_indices(len: usize, n: usize, rng: &mut Rng) -> Vec<usize> {
     all
 }
 
-/// Starthand einer Combo für die Prüfung: `Some(id)` = echte Karte,
-/// `None` = Platzhalter (passt auf jede übrige Karte).
-pub fn needs_of(starting_hand: &[Entry]) -> Vec<Option<u32>> {
-    starting_hand.iter().map(|e| e.slot.card_id()).collect()
+/// Was eine Combo an einer Stelle der Starthand braucht: eine der genannten
+/// Karten (Hauptkarte und ihre Alternativen). Leer = Platzhalter, passt auf
+/// jede übrige Karte.
+pub type Need = Vec<u32>;
+
+/// Starthand einer Combo für die Prüfung.
+pub fn needs_of(starting_hand: &[Entry]) -> Vec<Need> {
+    starting_hand.iter().map(need_of).collect()
+}
+
+fn need_of(e: &Entry) -> Need {
+    let mut ids = Vec::with_capacity(1 + e.alternatives.len());
+    for slot in std::iter::once(&e.slot).chain(&e.alternatives) {
+        match slot.card_id() {
+            Some(id) => ids.push(id),
+            // Ein Platzhalter als Karte oder Alternative: jede Karte passt.
+            None => return Vec::new(),
+        }
+    }
+    ids
 }
 
 /// Die Karten, die eine Combo wirklich auf der Starthand braucht:
@@ -84,7 +100,7 @@ pub fn needs_of(starting_hand: &[Entry]) -> Vec<Option<u32>> {
 /// wenn in den Schritten ein Platzhalter vorkommt.
 /// Benutzt die Combo keine Karte der Starthand (z. B. noch keine Schritte),
 /// gilt die ganze Starthand.
-pub fn needs_of_combo(combo: &Combo) -> Vec<Option<u32>> {
+pub fn needs_of_combo(combo: &Combo) -> Vec<Need> {
     let used: Vec<&Slot> = combo
         .steps
         .iter()
@@ -92,14 +108,14 @@ pub fn needs_of_combo(combo: &Combo) -> Vec<Option<u32>> {
         .map(|p| &p.entry.slot)
         .collect();
     let any_placeholder = used.iter().any(|s| s.card_id().is_none());
-    let needed: Vec<Option<u32>> = combo
+    let needed: Vec<Need> = combo
         .starting_hand
         .iter()
-        .map(|e| e.slot.card_id())
-        .filter(|id| match id {
-            Some(id) => used.iter().any(|s| s.card_id() == Some(*id)),
+        .filter(|e| match e.slot.card_id() {
+            Some(id) => used.iter().any(|s| s.card_id() == Some(id)),
             None => any_placeholder,
         })
+        .map(need_of)
         .collect();
     if needed.is_empty() {
         needs_of(&combo.starting_hand)
@@ -108,25 +124,34 @@ pub fn needs_of_combo(combo: &Combo) -> Vec<Option<u32>> {
     }
 }
 
-/// Ist die Combo mit dieser Hand spielbar? Jede echte Karte muss in der
-/// Hand sein (mehrfache Karten entsprechend oft). Jeder Platzhalter braucht
-/// eine weitere, noch nicht verwendete Karte. Eine leere Starthand ist nie
-/// spielbar.
-pub fn is_playable(needs: &[Option<u32>], hand: &[u32]) -> bool {
+/// Ist die Combo mit dieser Hand spielbar? Für jede Stelle der Starthand
+/// muss eine eigene Karte der Hand passen (mehrfache Karten entsprechend
+/// oft). Jeder Platzhalter braucht eine weitere, noch nicht verwendete
+/// Karte. Eine leere Starthand ist nie spielbar.
+pub fn is_playable(needs: &[Need], hand: &[u32]) -> bool {
     if needs.is_empty() || needs.len() > hand.len() {
         return false;
     }
-    let mut rest = hand.to_vec();
-    for id in needs.iter().flatten() {
-        match rest.iter().position(|h| h == id) {
-            Some(i) => {
-                rest.swap_remove(i);
+    // Stellen mit Alternativen können dieselbe Handkarte beanspruchen, darum
+    // werden alle Zuordnungen probiert. Die Platzhalter passen am Ende, weil
+    // `needs.len() <= hand.len()` gilt.
+    fn assign(needs: &[&Need], hand: &[u32], used: &mut [bool]) -> bool {
+        let Some((first, rest)) = needs.split_first() else {
+            return true;
+        };
+        for i in 0..hand.len() {
+            if !used[i] && first.contains(&hand[i]) {
+                used[i] = true;
+                if assign(rest, hand, used) {
+                    return true;
+                }
+                used[i] = false;
             }
-            None => return false,
         }
+        false
     }
-    // Die Platzhalter passen, weil `needs.len() <= hand.len()` gilt.
-    true
+    let fixed: Vec<&Need> = needs.iter().filter(|n| !n.is_empty()).collect();
+    assign(&fixed, hand, &mut vec![false; hand.len()])
 }
 
 /// Ergebnis einer Simulation.
@@ -144,7 +169,7 @@ pub struct SimCounts {
 /// Kopie einzeln) und zählt, wie oft jede Combo spielbar war.
 pub fn simulate(
     pool: &[u32],
-    needs: &[Vec<Option<u32>>],
+    needs: &[Vec<Need>],
     hand_size: usize,
     runs: u32,
     rng: &mut Rng,
@@ -443,8 +468,7 @@ impl ComboApp {
                 .iter()
                 .filter(|c| !c.starting_hand.is_empty())
                 .collect();
-            let needs: Vec<Vec<Option<u32>>> =
-                with_hand.iter().map(|c| needs_of_combo(c)).collect();
+            let needs: Vec<Vec<Need>> = with_hand.iter().map(|c| needs_of_combo(c)).collect();
             let counts = simulate(&ids, &needs, hand_size, SIM_RUNS, &mut self.hand_test.rng);
             self.hand_test.sim = Some(SimResult {
                 deck_id,
@@ -553,9 +577,15 @@ impl ComboApp {
                                 // Welche Karten für diese Combo gezählt wurden.
                                 let names: Vec<String> = needs_of_combo(c)
                                     .iter()
-                                    .map(|id| match id.and_then(|id| v.db.get(id)) {
-                                        Some(card) => card.localized_name(v.name_lang).to_string(),
-                                        None => tr("handtest.any_card").to_string(),
+                                    .map(|need| {
+                                        if need.is_empty() {
+                                            return tr("handtest.any_card").to_string();
+                                        }
+                                        need.iter()
+                                            .filter_map(|id| v.db.get(*id))
+                                            .map(|card| card.localized_name(v.name_lang))
+                                            .collect::<Vec<_>>()
+                                            .join(" / ")
                                     })
                                     .collect();
                                 ui.label(
@@ -750,7 +780,7 @@ mod tests {
             ],
             note: String::new(),
         }];
-        assert_eq!(needs_of_combo(&c), vec![Some(1)]);
+        assert_eq!(needs_of_combo(&c), vec![vec![1]]);
         assert!(is_playable(&needs_of_combo(&c), &[1, 7, 8]));
     }
 

@@ -431,12 +431,54 @@ impl ComboApp {
         };
         let mut clicked = None;
         let mut open_picker = false;
+        // Starthand: unter jeder Karte ihre Alternativen ("oder").
+        let with_alts = section == Section::StartingHand;
+        let mut add_alt = None;
+        let mut remove_alt = None;
         ui.horizontal_wrapped(|ui| {
             for (i, e) in section.entries(&self.combos[idx]).iter().enumerate() {
                 let hl = (self.selection == Some(Sel::Section(section, i))).then_some(SELECT_COLOR);
-                if entry_view(ui, &mut self.images, v, e, width, hl).clicked() {
-                    clicked = Some(i);
+                if !with_alts {
+                    if entry_view(ui, &mut self.images, v, e, width, hl).clicked() {
+                        clicked = Some(i);
+                    }
+                    continue;
                 }
+                let size = egui::Vec2::new(width + 6.0, width * 1.46);
+                ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
+                    ui.set_width(width + 6.0);
+                    if entry_view(ui, &mut self.images, v, e, width, hl).clicked() {
+                        clicked = Some(i);
+                    }
+                    if !e.alternatives.is_empty() {
+                        ui.label(RichText::new(tr("editor.alt_or")).weak());
+                        let small = ((width - 4.0) / 2.0).max(28.0);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = egui::Vec2::splat(3.0);
+                            for (ai, alt) in e.alternatives.iter().enumerate() {
+                                let r = super::widgets::card_widget(
+                                    ui,
+                                    &mut self.images,
+                                    v,
+                                    alt,
+                                    Default::default(),
+                                    small,
+                                    None,
+                                );
+                                if r.on_hover_text(tr("editor.alt_remove_hint")).clicked() {
+                                    remove_alt = Some((i, ai));
+                                }
+                            }
+                        });
+                    }
+                    if ui
+                        .small_button(tr("editor.alt_add"))
+                        .on_hover_text(tr("editor.alt_hint"))
+                        .clicked()
+                    {
+                        add_alt = Some(i);
+                    }
+                });
             }
             if add_button(ui, width, tr("editor.add_card")) {
                 open_picker = true;
@@ -450,6 +492,13 @@ impl ComboApp {
             self.mark_dirty();
         } else if let Some(i) = clicked {
             self.selection = Some(Sel::Section(section, i));
+        }
+        if let Some((i, ai)) = remove_alt {
+            self.combos[idx].starting_hand[i].alternatives.remove(ai);
+            self.mark_dirty();
+        }
+        if let Some(i) = add_alt {
+            self.open_picker(Target::Alt(i));
         }
         if open_picker {
             self.open_picker(Target::Section(section));

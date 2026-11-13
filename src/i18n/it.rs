@@ -692,6 +692,21 @@ pub const T: &[(&str, &str)] = &[
     ),
     ("ban.deck_bad", "{0} carta/e con troppe copie"),
     ("ban.deck_line", "{0}: {1} – {2}× nel deck, permesse: {3}"),
+    ("editor.alt_add", "+ oppure"),
+    ("editor.alt_or", "oppure"),
+    (
+        "editor.alt_hint",
+        "Aggiungi una carta che può sostituire questa carta nella mano iniziale. La combo conta allora come giocabile anche con quella carta.",
+    ),
+    (
+        "editor.alt_remove_hint",
+        "Alternativa. Clicca per rimuoverla.",
+    ),
+    ("practice.hand_choice", "Mano iniziale:"),
+    (
+        "textimport.rule_alt",
+        "7. In «hand:», «|» separa le alternative per una carta: «hand: Gold Leo + Foolish Burial | Masquerade».",
+    ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

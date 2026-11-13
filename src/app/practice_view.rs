@@ -12,10 +12,27 @@ use crate::practice::{Session, Verdict};
 
 impl ComboApp {
     pub(super) fn start_practice(&mut self, idx: usize) {
+        // Gewählte Starthand behalten, solange sie zur Combo passt.
+        let base = &self.combos[idx];
+        let choice: Vec<usize> = match &self.practice {
+            Some(p) if p.session.combo_id == base.id => base
+                .starting_hand
+                .iter()
+                .enumerate()
+                .map(|(i, e)| {
+                    let n = p.choice.get(i).copied().unwrap_or(0);
+                    if n <= e.alternatives.len() { n } else { 0 }
+                })
+                .collect(),
+            _ => vec![0; base.starting_hand.len()],
+        };
+        let combo = base.with_hand_choice(&choice);
         self.practice = Some(Practice {
-            session: Session::new(&self.combos[idx]),
+            session: Session::new(&combo),
             field: FieldUi::default(),
             feedback: None,
+            combo,
+            choice,
         });
     }
 
@@ -63,9 +80,13 @@ impl ComboApp {
             name_lang: self.name_lang(),
             ban: &self.ban_index,
         };
-        let combo = &self.combos[idx];
+        let base = &self.combos[idx];
         let p = self.practice.as_mut().expect("practice");
+        // Geübt wird die Combo mit der gewählten Starthand.
+        let variant = p.combo.clone();
+        let combo = &variant;
         let auto_zone = self.settings.auto_zone;
+        let mut new_choice = None;
         let mut hint = false;
         let mut reveal = false;
         let mut restart = false;
@@ -87,7 +108,7 @@ impl ComboApp {
                 ui.label(
                     RichText::new(trf(
                         "practice.stats",
-                        &[&combo.practice.attempts, &combo.practice.best_percent],
+                        &[&base.practice.attempts, &base.practice.best_percent],
                     ))
                     .weak(),
                 );
@@ -96,6 +117,26 @@ impl ComboApp {
                 restart = ui.button(tr("practice.restart")).clicked();
                 stop = ui.button(tr("practice.stop")).clicked();
             });
+            // Auswahl der Starthand, wenn Karten Alternativen haben.
+            if base.has_hand_alternatives() {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(tr("practice.hand_choice"));
+                    for (i, e) in base.starting_hand.iter().enumerate() {
+                        if e.alternatives.is_empty() {
+                            continue;
+                        }
+                        let current = p.choice.get(i).copied().unwrap_or(0);
+                        let options = std::iter::once(&e.slot).chain(&e.alternatives);
+                        for (n, slot) in options.enumerate() {
+                            let name = super::widgets::shown_name(v, slot);
+                            if ui.selectable_label(current == n, name).clicked() && current != n {
+                                new_choice = Some((i, n));
+                            }
+                        }
+                        ui.separator();
+                    }
+                });
+            }
             ui.separator();
 
             if p.session.show_endboard && !combo.endboard.is_empty() {
@@ -216,7 +257,7 @@ impl ComboApp {
         let name_lang = self.name_lang();
         if hint
             && let Some(p) = &mut self.practice
-            && let Some(slot) = p.session.hint(&self.combos[idx])
+            && let Some(slot) = p.session.hint(&p.combo.clone())
         {
             let name = super::widgets::shown_name(
                 CardView {
@@ -231,11 +272,10 @@ impl ComboApp {
         }
         if reveal {
             let db = &self.db;
-            let combo = &self.combos[idx];
             if let Some(p) = &mut self.practice
                 && let Some(mv) = p
                     .session
-                    .reveal(combo, |s| (kind_of(db, s), is_extra(db, s)))
+                    .reveal(&p.combo.clone(), |s| (kind_of(db, s), is_extra(db, s)))
             {
                 let name = super::widgets::shown_name(
                     CardView {
@@ -251,6 +291,15 @@ impl ComboApp {
                 ));
                 p.field.reset();
             }
+        }
+        if let Some((i, n)) = new_choice
+            && let Some(p) = &mut self.practice
+        {
+            if p.choice.len() <= i {
+                p.choice.resize(i + 1, 0);
+            }
+            p.choice[i] = n;
+            restart = true;
         }
         if restart {
             self.start_practice(idx);

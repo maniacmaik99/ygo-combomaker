@@ -629,6 +629,18 @@ pub const T: &[(&str, &str)] = &[
     ("ban.deck_ok", "all cards are allowed in this number"),
     ("ban.deck_bad", "{0} card(s) with too many copies"),
     ("ban.deck_line", "{0}: {1} – {2}× in the deck, allowed: {3}"),
+    ("editor.alt_add", "+ or"),
+    ("editor.alt_or", "or"),
+    (
+        "editor.alt_hint",
+        "Add a card that can replace this card in the starting hand. The combo then also counts as playable with that card.",
+    ),
+    ("editor.alt_remove_hint", "Alternative. Click to remove it."),
+    ("practice.hand_choice", "Starting hand:"),
+    (
+        "textimport.rule_alt",
+        "7. In \"hand:\", \"|\" separates alternatives for one card: \"hand: Gold Leo + Foolish Burial | Masquerade\".",
+    ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

@@ -19,7 +19,8 @@
 //! Rules:
 //! - `# Title` starts a combo. One text may contain several combos.
 //! - `deck:`, `author:`, `hand:`, `end:`, `through:` and `note:` are optional.
-//!   Cards in a list are separated by `+`.
+//!   Cards in a list are separated by `+`. In `hand:`, `|` separates
+//!   alternatives for one card: `hand: Gold Leo + Foolish Burial | Wolf`.
 //! - Every other line is one move: keyword, then the card name. Several
 //!   moves in one line are separated by ` > `.
 //! - An empty line (or `---`) starts a new step.
@@ -435,7 +436,26 @@ pub fn parse(text: &str, db: &CardDb, decks: &[Deck]) -> Parsed {
                         cur.combo.deck_id = deck.map(|d| d.id);
                         res.set_context(value, deck);
                     }
-                    "hand" => cur.combo.starting_hand = list(value, &mut res, &mut out),
+                    "hand" => {
+                        // "A | B" = Karte A, ersetzbar durch B.
+                        cur.combo.starting_hand = value
+                            .split('+')
+                            .filter(|s| !s.trim().is_empty())
+                            .filter_map(|group| {
+                                let mut names =
+                                    group.split('|').map(str::trim).filter(|s| !s.is_empty());
+                                let mut entry =
+                                    Entry::new(slot_for(names.next()?, &mut res, &mut out));
+                                for n in names {
+                                    let alt = slot_for(n, &mut res, &mut out);
+                                    if alt != entry.slot && !entry.alternatives.contains(&alt) {
+                                        entry.alternatives.push(alt);
+                                    }
+                                }
+                                Some(entry)
+                            })
+                            .collect();
+                    }
                     "through" => cur.combo.plays_around = list(value, &mut res, &mut out),
                     "end" => {
                         cur.combo.endboard = list(value, &mut res, &mut out);
@@ -589,7 +609,19 @@ pub fn to_text(combo: &Combo) -> String {
         out.push_str(&format!("note: {}\n", l.trim()));
     }
     if !combo.starting_hand.is_empty() {
-        out.push_str(&format!("hand: {}\n", names(&combo.starting_hand)));
+        let hand = combo
+            .starting_hand
+            .iter()
+            .map(|e| {
+                std::iter::once(&e.slot)
+                    .chain(&e.alternatives)
+                    .map(|s| s.display_name().to_string())
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            })
+            .collect::<Vec<_>>()
+            .join(" + ");
+        out.push_str(&format!("hand: {hand}\n"));
     }
     if !combo.plays_around.is_empty() {
         out.push_str(&format!("through: {}\n", names(&combo.plays_around)));
@@ -736,6 +768,25 @@ mod tests {
             let slots = |v: &[Entry]| v.iter().map(|e| e.slot.clone()).collect::<Vec<_>>();
             assert_eq!(slots(&again.combos[0].endboard), slots(&c.endboard));
         }
+    }
+
+    #[test]
+    fn alternatives_in_the_hand_line() {
+        let text = "# T\nhand: Lunalight Gold Leo + Foolish Burial | Lunalight Wolf | Foolish Burial\n\nact Foolish Burial\n";
+        let p = parse(text, &db(), &[]);
+        let hand = &p.combos[0].starting_hand;
+        assert_eq!(hand.len(), 2);
+        assert!(hand[0].alternatives.is_empty());
+        assert_eq!(hand[1].slot.card_id(), Some(7));
+        // The repeated name is not stored twice.
+        assert_eq!(hand[1].alternatives.len(), 1);
+        assert_eq!(hand[1].alternatives[0].card_id(), Some(3));
+        let again = parse(&to_text(&p.combos[0]), &db(), &[]);
+        assert_eq!(again.combos[0].starting_hand, *hand);
+        // Practising with the alternative replaces the card in the steps too.
+        let variant = p.combos[0].with_hand_choice(&[0, 1]);
+        assert_eq!(variant.starting_hand[1].slot.card_id(), Some(3));
+        assert_eq!(variant.steps[0].parts[0].entry.slot.card_id(), Some(3));
     }
 
     #[test]

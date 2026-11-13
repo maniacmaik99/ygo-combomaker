@@ -50,6 +50,8 @@ enum EditMode {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Target {
     Section(Section),
+    /// Alternative zur Karte mit dieser Position in der Starthand.
+    Alt(usize),
     Step(usize),
     Deck,
     /// Karte für das Spielfeld aus Deck oder Extra Deck (Aufnahme).
@@ -90,6 +92,10 @@ struct Practice {
     field: FieldUi,
     /// Rückmeldung zum letzten Zug: (Text, richtig?).
     feedback: Option<(String, bool)>,
+    /// Die geübte Combo mit der gewählten Starthand (siehe `choice`).
+    combo: crate::model::Combo,
+    /// Pro Karte der Starthand: 0 = Hauptkarte, 1.. = Alternative.
+    choice: Vec<usize>,
 }
 
 enum UpdateState {
@@ -920,6 +926,7 @@ fn text_format_help(ui: &mut egui::Ui) {
     ui.label(tr("textimport.intro"));
     ui.add_space(4.0);
     ui.label(tr("textimport.rules"));
+    ui.label(tr("textimport.rule_alt"));
     ui.add_space(6.0);
     ui.label(RichText::new(tr("textimport.example")).strong());
     ui.label(RichText::new(EXAMPLE).monospace());

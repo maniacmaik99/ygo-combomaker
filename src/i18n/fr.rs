@@ -713,6 +713,21 @@ pub const T: &[(&str, &str)] = &[
         "ban.deck_line",
         "{0} : {1} – {2}× dans le deck, autorisé : {3}",
     ),
+    ("editor.alt_add", "+ ou"),
+    ("editor.alt_or", "ou"),
+    (
+        "editor.alt_hint",
+        "Ajouter une carte qui peut remplacer cette carte dans la main de départ. Le combo compte alors aussi comme jouable avec cette carte.",
+    ),
+    (
+        "editor.alt_remove_hint",
+        "Alternative. Cliquez pour la retirer.",
+    ),
+    ("practice.hand_choice", "Main de départ :"),
+    (
+        "textimport.rule_alt",
+        "7. Dans « hand: », « | » sépare les alternatives pour une carte : « hand: Gold Leo + Foolish Burial | Masquerade ».",
+    ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

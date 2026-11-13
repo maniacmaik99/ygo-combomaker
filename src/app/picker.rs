@@ -51,6 +51,18 @@ impl ComboApp {
                     self.mark_dirty();
                 }
             }
+            Target::Alt(i) => {
+                if let Some(e) = self
+                    .selected
+                    .and_then(|idx| self.combos[idx].starting_hand.get_mut(i))
+                    && e.slot != slot
+                    && !e.alternatives.contains(&slot)
+                {
+                    e.alternatives.push(slot);
+                    self.mark_dirty();
+                }
+                self.picker = None;
+            }
             Target::Step(si) => {
                 if let Some(step) = self.selected.and_then(|i| self.combos[i].steps.get_mut(si)) {
                     step.parts.push(StepPart {

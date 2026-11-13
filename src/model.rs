@@ -381,6 +381,10 @@ pub struct Entry {
     pub zone: Zone,
     #[serde(default)]
     pub facing: Facing,
+    /// Karten, die diese Karte ersetzen können. Nur in der Starthand benutzt:
+    /// Die Combo ist auch mit einer dieser Karten statt `slot` spielbar.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub alternatives: Vec<Slot>,
 }
 
 impl Entry {
@@ -391,6 +395,7 @@ impl Entry {
             note: String::new(),
             zone: Zone::None,
             facing: Facing::Unspecified,
+            alternatives: Vec::new(),
         }
     }
 }
@@ -474,6 +479,42 @@ pub struct Combo {
 }
 
 impl Combo {
+    /// Hat mindestens eine Karte der Starthand eine Alternative?
+    pub fn has_hand_alternatives(&self) -> bool {
+        self.starting_hand
+            .iter()
+            .any(|e| !e.alternatives.is_empty())
+    }
+
+    /// Die Combo mit einer anderen Starthand: `choice[i]` wählt für die
+    /// Karte `i` der Starthand die Hauptkarte (0) oder eine Alternative
+    /// (1 = erste Alternative, …). Die gewählte Karte ersetzt die Hauptkarte
+    /// auch in allen Schritten und im Endboard.
+    pub fn with_hand_choice(&self, choice: &[usize]) -> Combo {
+        let mut c = self.clone();
+        for (i, e) in self.starting_hand.iter().enumerate() {
+            let Some(alt) = choice
+                .get(i)
+                .and_then(|n| n.checked_sub(1))
+                .and_then(|n| e.alternatives.get(n))
+            else {
+                continue;
+            };
+            c.starting_hand[i].slot = alt.clone();
+            let targets = c
+                .steps
+                .iter_mut()
+                .flat_map(|s| s.parts.iter_mut().map(|p| &mut p.entry))
+                .chain(c.endboard.iter_mut());
+            for t in targets {
+                if t.slot == e.slot {
+                    t.slot = alt.clone();
+                }
+            }
+        }
+        c
+    }
+
     pub fn new(title: impl Into<String>) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -657,6 +698,7 @@ mod tests {
                         note: "NS".into(),
                         zone: Zone::MonsterZone,
                         facing: Facing::FaceUp,
+                        alternatives: Vec::new(),
                     },
                 },
                 StepPart {
