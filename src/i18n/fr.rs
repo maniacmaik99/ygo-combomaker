@@ -728,6 +728,17 @@ pub const T: &[(&str, &str)] = &[
         "textimport.rule_alt",
         "7. Dans « hand: », « | » sépare les alternatives pour une carte : « hand: Gold Leo + Foolish Burial | Masquerade ».",
     ),
+    ("entry.only_with", "Jouer cette action seulement avec :"),
+    ("entry.only_with_always", "toujours"),
+    (
+        "entry.only_with_hint",
+        "Pour les combos avec des mains de départ alternatives : cette action n’est jouée que si la carte choisie est dans la main de départ. « toujours » = l’action appartient à chaque variante.",
+    ),
+    ("entry.only_with_short", "seulement avec {0}"),
+    (
+        "textimport.rule_if",
+        "8. « [if Carte] » au début d’une ligne : les actions de cette ligne ne sont jouées que si cette carte est dans la main de départ (carte principale ou alternative).",
+    ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

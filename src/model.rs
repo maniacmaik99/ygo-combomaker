@@ -385,6 +385,11 @@ pub struct Entry {
     /// Die Combo ist auch mit einer dieser Karten statt `slot` spielbar.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub alternatives: Vec<Slot>,
+    /// Nur in Schritten benutzt: Dieser Zug gehört nur zur Combo, wenn diese
+    /// Karte der Starthand gewählt ist (Hauptkarte oder Alternative).
+    /// `None` = der Zug wird immer gespielt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub only_with: Option<Slot>,
 }
 
 impl Entry {
@@ -396,6 +401,7 @@ impl Entry {
             zone: Zone::None,
             facing: Facing::Unspecified,
             alternatives: Vec::new(),
+            only_with: None,
         }
     }
 }
@@ -486,30 +492,79 @@ impl Combo {
             .any(|e| !e.alternatives.is_empty())
     }
 
+    /// Karten der Starthand, zwischen denen gewählt wird (Hauptkarten mit
+    /// Alternativen und die Alternativen selbst).
+    pub fn hand_options(&self) -> Vec<Slot> {
+        let mut out: Vec<Slot> = Vec::new();
+        for e in self
+            .starting_hand
+            .iter()
+            .filter(|e| !e.alternatives.is_empty())
+        {
+            for s in std::iter::once(&e.slot).chain(&e.alternatives) {
+                if !out.contains(s) {
+                    out.push(s.clone());
+                }
+            }
+        }
+        out
+    }
+
+    /// Die Karte, die `choice` für die Karte `i` der Starthand wählt.
+    fn chosen_slot(&self, i: usize, choice: &[usize]) -> &Slot {
+        let e = &self.starting_hand[i];
+        choice
+            .get(i)
+            .and_then(|n| n.checked_sub(1))
+            .and_then(|n| e.alternatives.get(n))
+            .unwrap_or(&e.slot)
+    }
+
     /// Die Combo mit einer anderen Starthand: `choice[i]` wählt für die
     /// Karte `i` der Starthand die Hauptkarte (0) oder eine Alternative
-    /// (1 = erste Alternative, …). Die gewählte Karte ersetzt die Hauptkarte
-    /// auch in allen Schritten und im Endboard.
+    /// (1 = erste Alternative, …).
+    ///
+    /// - Züge mit `only_with` bleiben nur, wenn ihre Karte gewählt ist.
+    /// - In allen anderen Zügen und im Endboard ersetzt die gewählte Karte
+    ///   die Hauptkarte.
+    ///
+    /// Das Ergebnis enthält keine `only_with`-Marken und keine leeren Schritte.
     pub fn with_hand_choice(&self, choice: &[usize]) -> Combo {
         let mut c = self.clone();
+        let chosen: Vec<&Slot> = (0..self.starting_hand.len())
+            .map(|i| self.chosen_slot(i, choice))
+            .collect();
+        for step in &mut c.steps {
+            step.parts.retain(|p| {
+                p.entry
+                    .only_with
+                    .as_ref()
+                    .is_none_or(|w| chosen.contains(&w))
+            });
+        }
+        c.steps.retain(|s| !s.parts.is_empty());
         for (i, e) in self.starting_hand.iter().enumerate() {
-            let Some(alt) = choice
-                .get(i)
-                .and_then(|n| n.checked_sub(1))
-                .and_then(|n| e.alternatives.get(n))
-            else {
+            let alt = chosen[i];
+            if *alt == e.slot {
                 continue;
-            };
+            }
             c.starting_hand[i].slot = alt.clone();
             let targets = c
                 .steps
                 .iter_mut()
                 .flat_map(|s| s.parts.iter_mut().map(|p| &mut p.entry))
+                // Züge nur für eine bestimmte Karte nennen ihre Karten selbst.
+                .filter(|t| t.only_with.is_none())
                 .chain(c.endboard.iter_mut());
             for t in targets {
                 if t.slot == e.slot {
                     t.slot = alt.clone();
                 }
+            }
+        }
+        for step in &mut c.steps {
+            for p in &mut step.parts {
+                p.entry.only_with = None;
             }
         }
         c
@@ -699,6 +754,7 @@ mod tests {
                         zone: Zone::MonsterZone,
                         facing: Facing::FaceUp,
                         alternatives: Vec::new(),
+                        only_with: None,
                     },
                 },
                 StepPart {

@@ -113,6 +113,7 @@ Regeln:
 5. `[zone]` am Ende eines Zugs wählt eine Zone. `// Text` fügt dem Zug eine Notiz hinzu.
 6. Ohne `end:` nimmt die App die Karten, die am Ende auf dem Feld liegen, als Endboard.
 7. In `hand:` trennt `|` Alternativen für eine Karte: `hand: Gold Leo + Foolish Burial | Masquerade`.
+8. `[if Karte]` am Zeilenanfang: Die Züge dieser Zeile werden nur gespielt, wenn diese Karte in der Starthand ist (Hauptkarte oder Alternative). Beispiel: `[if Masquerade] act Masquerade > send Yellow Marten`.
 
 Kartennamen dürfen gekürzt sein (`Gold Leo` statt `Lunalight Gold Leo`). Bei mehreren Treffern gewinnt die Karte aus der Deckliste oder dem Archetyp, der bei `deck:` steht. Kleine Tippfehler werden korrigiert.
 
@@ -183,13 +184,14 @@ Das fertige Programm liegt danach unter `target/release/ygo-combomaker` (Windows
 | Combos, Einstellungen | `~/.local/share/ygo-combomaker/` | `%APPDATA%\ygo-combomaker\data\` |
 | Kartendatenbank, Bilder | `~/.cache/ygo-combomaker/` | `%LOCALAPPDATA%\ygo-combomaker\cache\` |
 
-## Funktionen (Stand 0.10)
+## Funktionen (Stand 0.11)
 
 - **Sprachen:** Englisch, Deutsch, Französisch, Italienisch, Spanisch, Portugiesisch (Einstellungen → Sprache). Kartennamen optional in der gewählten Sprache (außer Spanisch, das bietet die Kartendatenbank nicht an).
 - **Bedienung wie im Spiel:** Karte anklicken → direkt an der Karte erscheint ein Menü mit den Aktionen, die an diesem Ort üblich sind (z. B. Hand: Normalbeschwörung, Spezialbeschwörung, Setzen, Effekt aktivieren). Oder die Karte mit der Maus auf eine Zone, den Friedhof, den Verbannt-Stapel oder die Hand ziehen. Deck und Extra Deck sind Stapel auf dem Feld. Esc oder Rechtsklick bricht ab, Strg+Z macht den letzten aufgenommenen Zug rückgängig. Optional wählt die App freie Zonen automatisch (Einstellungen).
 - **Tipp beim Üben:** markiert die Karte des nächsten Zugs.
 - **Handtest:** zieht eine zufällige Starthand aus einer Deckliste, zeigt, welche gespeicherten Combos damit spielbar sind, und simuliert 1000 Hände (Anteil der Hände, mit denen eine Combo spielbar ist). Als benötigt zählen nur die Karten der Starthand, die in den Schritten der Combo auch benutzt werden.
 - **Alternative Starthände:** Unter jeder Karte der Starthand fügt „+ oder“ Karten hinzu, die diese Karte ersetzen können. Der Handtest zählt die Combo dann auch mit einer Alternative als spielbar. Beim Üben wählst du oben die Starthand; die gewählte Karte ersetzt die Hauptkarte in allen Schritten.
+- **Alternative Züge:** Im Listenmodus einen Zug anklicken und bei „Diesen Zug nur spielen mit:“ eine Karte der Starthand wählen. Der Zug gehört dann nur zu der Variante mit dieser Karte. Unter dem Zug steht „nur mit …“.
 - **Bannliste:** In den Einstellungen Master Duel, TCG oder OCG wählen. Karten tragen oben links eine Marke: rotes Verbotszeichen = verboten, orange 1 = limitiert, gelbe 2 = halb-limitiert. Die Decklisten-Ansicht meldet Karten mit zu vielen Kopien und zeigt das Datum der Liste.
 - **Suche in der Combo-Liste.**
 - **Freies Spiel im Handtest:** Die gezogene Hand lässt sich auf einem Spielfeld frei ausspielen (ohne Prüfung, mit Rückgängig).

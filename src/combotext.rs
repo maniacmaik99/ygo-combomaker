@@ -25,6 +25,8 @@
 //!   moves in one line are separated by ` > `.
 //! - An empty line (or `---`) starts a new step.
 //! - `[zone]` at the end of a move picks a zone, `// text` adds a note.
+//! - `[if Card]` at the start of a line: the moves of this line are played
+//!   only when the starting hand contains this card (main card or alternative).
 
 use std::collections::{HashMap, HashSet};
 
@@ -481,6 +483,17 @@ pub fn parse(text: &str, db: &CardDb, decks: &[Deck]) -> Parsed {
             }
         }
 
+        // "[if Card] move > move": these moves belong only to the variant
+        // of the combo that starts with this card.
+        let (only_with, line) = match line.strip_prefix("[if ").and_then(|r| r.split_once(']')) {
+            Some((name, rest)) => (Some(slot_for(name, &mut res, &mut out)), rest.trim()),
+            None => (None, line),
+        };
+        // Moves for an alternative are not played on the test board.
+        let on_board = only_with
+            .as_ref()
+            .is_none_or(|w| cur.combo.starting_hand.iter().any(|e| e.slot == *w));
+
         for seg in line.split(" > ") {
             let (seg, note) = match seg.split_once("//") {
                 Some((s, n)) => (s.trim(), n.trim()),
@@ -552,6 +565,7 @@ pub fn parse(text: &str, db: &CardDb, decks: &[Deck]) -> Parsed {
                 action,
                 zone,
                 note: note.to_string(),
+                only_with: only_with.clone(),
                 ..Entry::new(slot)
             };
             // Play the move on a board to find moves that cannot work.
@@ -559,7 +573,7 @@ pub fn parse(text: &str, db: &CardDb, decks: &[Deck]) -> Parsed {
                 .board
                 .get_or_insert_with(|| Board::with_hand(&cur.combo.starting_hand));
             let mv = board::part_to_move(board, &entry, kind, extra);
-            if let Err(e) = board.apply(&mv, kind) {
+            if on_board && let Err(e) = board.apply(&mv, kind) {
                 out.problems.push(trf(
                     "textimport.line",
                     &[
@@ -630,6 +644,9 @@ pub fn to_text(combo: &Combo) -> String {
         out.push('\n');
         for part in &step.parts {
             let e = &part.entry;
+            if let Some(only) = &e.only_with {
+                out.push_str(&format!("[if {}] ", only.display_name()));
+            }
             out.push_str(&format!("{} {}", keyword(e.action), e.slot.display_name()));
             let default_zone = e.action == Action::Search && e.zone == Zone::Hand;
             if !default_zone && let Some((tag, _)) = ZONE_TAGS.iter().find(|(_, z)| *z == e.zone) {
@@ -787,6 +804,42 @@ mod tests {
         let variant = p.combos[0].with_hand_choice(&[0, 1]);
         assert_eq!(variant.starting_hand[1].slot.card_id(), Some(3));
         assert_eq!(variant.steps[0].parts[0].entry.slot.card_id(), Some(3));
+    }
+
+    #[test]
+    fn moves_for_one_starting_hand_only() {
+        let text = "# T\nhand: Lunalight Gold Leo + Foolish Burial | Lunalight Wolf\n\n\
+                    ns Lunalight Gold Leo\n\
+                    [if Foolish Burial] act Foolish Burial > send Lunalight Yellow Marten\n\
+                    [if Lunalight Wolf] scale Lunalight Wolf\n\
+                    link S:P Little Knight\n";
+        let p = parse(text, &db(), &[]);
+        assert!(p.problems.is_empty(), "{:?}", p.problems);
+        let c = &p.combos[0];
+        assert_eq!(c.steps[0].parts.len(), 5);
+        assert_eq!(c.hand_options().len(), 2);
+        // Main hand: the Wolf move is left out.
+        let main = c.with_hand_choice(&[]);
+        let ids = |c: &Combo| -> Vec<u32> {
+            c.steps
+                .iter()
+                .flat_map(|s| &s.parts)
+                .filter_map(|p| p.entry.slot.card_id())
+                .collect()
+        };
+        assert_eq!(ids(&main), vec![1, 7, 2, 6]);
+        // Alternative: the Foolish Burial moves are left out.
+        let alt = c.with_hand_choice(&[0, 1]);
+        assert_eq!(ids(&alt), vec![1, 3, 6]);
+        assert!(
+            alt.steps
+                .iter()
+                .flat_map(|s| &s.parts)
+                .all(|p| p.entry.only_with.is_none())
+        );
+        // Round trip keeps the marks.
+        let again = parse(&to_text(c), &db(), &[]);
+        assert_eq!(again.combos[0].steps, c.steps);
     }
 
     #[test]

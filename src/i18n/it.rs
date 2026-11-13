@@ -707,6 +707,17 @@ pub const T: &[(&str, &str)] = &[
         "textimport.rule_alt",
         "7. In «hand:», «|» separa le alternative per una carta: «hand: Gold Leo + Foolish Burial | Masquerade».",
     ),
+    ("entry.only_with", "Gioca questa mossa solo con:"),
+    ("entry.only_with_always", "sempre"),
+    (
+        "entry.only_with_hint",
+        "Per le combo con mani iniziali alternative: questa mossa viene giocata solo se la carta scelta è nella mano iniziale. «sempre» = la mossa appartiene a ogni variante.",
+    ),
+    ("entry.only_with_short", "solo con {0}"),
+    (
+        "textimport.rule_if",
+        "8. «[if Carta]» all’inizio di una riga: le mosse di questa riga vengono giocate solo se questa carta è nella mano iniziale (carta principale o alternativa).",
+    ),
     ("settings.auto_zone", "Board: choose the zone automatically"),
     (
         "settings.auto_zone_hint",

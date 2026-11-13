@@ -674,6 +674,17 @@ pub const T: &[(&str, &str)] = &[
         "textimport.rule_alt",
         "7. In „hand:“ trennt „|“ Alternativen für eine Karte: „hand: Gold Leo + Foolish Burial | Masquerade“.",
     ),
+    ("entry.only_with", "Diesen Zug nur spielen mit:"),
+    ("entry.only_with_always", "immer"),
+    (
+        "entry.only_with_hint",
+        "Für Combos mit alternativen Starthänden: Dieser Zug wird nur gespielt, wenn die gewählte Karte in der Starthand ist. „immer“ = der Zug gehört zu jeder Variante.",
+    ),
+    ("entry.only_with_short", "nur mit {0}"),
+    (
+        "textimport.rule_if",
+        "8. „[if Karte]“ am Zeilenanfang: Die Züge dieser Zeile werden nur gespielt, wenn diese Karte in der Starthand ist (Hauptkarte oder Alternative).",
+    ),
     ("settings.auto_zone", "Spielfeld: Zone automatisch wählen"),
     (
         "settings.auto_zone_hint",

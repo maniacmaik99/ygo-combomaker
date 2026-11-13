@@ -927,6 +927,7 @@ fn text_format_help(ui: &mut egui::Ui) {
     ui.add_space(4.0);
     ui.label(tr("textimport.rules"));
     ui.label(tr("textimport.rule_alt"));
+    ui.label(tr("textimport.rule_if"));
     ui.add_space(6.0);
     ui.label(RichText::new(tr("textimport.example")).strong());
     ui.label(RichText::new(EXAMPLE).monospace());

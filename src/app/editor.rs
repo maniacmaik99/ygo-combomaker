@@ -171,7 +171,8 @@ impl ComboApp {
 
     /// Baut das Feld aus Starthand und allen gespeicherten Schritten auf.
     fn rebuild_board(&self, idx: usize) -> Board {
-        let combo = &self.combos[idx];
+        // Züge, die nur zu einer Alternative gehören, liegen nicht auf dem Feld.
+        let combo = &self.combos[idx].with_hand_choice(&[]);
         let mut b = Board::with_hand(&combo.starting_hand);
         for step in &combo.steps {
             for part in &step.parts {
@@ -646,6 +647,12 @@ impl ComboApp {
             name_lang: self.name_lang(),
             ban: &self.ban_index,
         };
+        // Karten der Starthand, zwischen denen gewählt wird (für Züge, die
+        // nur mit einer bestimmten Karte gespielt werden).
+        let hand_options = match sel {
+            Sel::StepPart(..) => self.combos[idx].hand_options(),
+            Sel::Section(..) => Vec::new(),
+        };
         let combo = &mut self.combos[idx];
         let (entry, connector, len, pos) = match sel {
             Sel::Section(sec, i) => {
@@ -724,6 +731,25 @@ impl ComboApp {
                     .changed();
             }
         });
+
+        if !hand_options.is_empty() || entry.only_with.is_some() {
+            ui.label(tr("entry.only_with"))
+                .on_hover_text(tr("entry.only_with_hint"));
+            ui.horizontal_wrapped(|ui| {
+                changed |= ui
+                    .selectable_value(&mut entry.only_with, None, tr("entry.only_with_always"))
+                    .changed();
+                for slot in &hand_options {
+                    changed |= ui
+                        .selectable_value(
+                            &mut entry.only_with,
+                            Some(slot.clone()),
+                            shown_name(v, slot),
+                        )
+                        .changed();
+                }
+            });
+        }
 
         if let Some(conn) = connector {
             ui.label(tr("entry.connector"));

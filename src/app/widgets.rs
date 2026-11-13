@@ -286,6 +286,10 @@ pub fn entry_view(
             width,
             highlight,
         );
+        if let Some(only) = &entry.only_with {
+            let text = crate::i18n::trf("entry.only_with_short", &[&shown_name(v, only)]);
+            ui.add(egui::Label::new(RichText::new(text).small().color(SELECT_COLOR)).wrap());
+        }
         if !entry.note.is_empty() {
             ui.add(egui::Label::new(RichText::new(&entry.note).small()).wrap());
         }
